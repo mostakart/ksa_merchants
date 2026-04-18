@@ -33,17 +33,18 @@ from scraper.utils import normalize_url
 # ── Paths ────────────────────────────────────────────────────────────────────
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-CHECKPOINT_FILE = BASE_DIR / "scraped_urls.json"
-RESULTS_JSON = BASE_DIR / "scraped_results.json"
-RESULTS_CSV = BASE_DIR / "scraped_results.csv"
+DATA_DIR = BASE_DIR / "data"
+CHECKPOINT_FILE = DATA_DIR / "checkpoints" / "scraped_urls.json"
+RESULTS_JSON = DATA_DIR / "output" / "scraped_results.json"
+RESULTS_CSV = DATA_DIR / "output" / "scraped_results.csv"
 
 EXCEL_FILES = [
-    BASE_DIR / "KSA_Merchants_Riyadh.xlsx",
-    BASE_DIR / "KSA_Merchants_Jeddah.xlsx",
-    BASE_DIR / "KSA_Merchants_Dammam.xlsx",
-    BASE_DIR / "KSA_Merchants_Khobar.xlsx",
-    BASE_DIR / "KSA_Merchants_Mecca.xlsx",
-    BASE_DIR / "KSA_Merchants_Medina.xlsx",
+    DATA_DIR / "input" / "KSA_Merchants_Riyadh.xlsx",
+    DATA_DIR / "input" / "KSA_Merchants_Jeddah.xlsx",
+    DATA_DIR / "input" / "KSA_Merchants_Dammam.xlsx",
+    DATA_DIR / "input" / "KSA_Merchants_Khobar.xlsx",
+    DATA_DIR / "input" / "KSA_Merchants_Mecca.xlsx",
+    DATA_DIR / "input" / "KSA_Merchants_Medina.xlsx",
 ]
 
 

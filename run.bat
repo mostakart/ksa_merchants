@@ -22,11 +22,11 @@ echo.
 echo ============================================
 echo   All done!
 echo   Output files:
-echo     scraped_urls.json       (checkpoint)
-echo     scraped_results.json    (raw results)
-echo     scraped_results.csv     (flat CSV)
-echo     *_ENRICHED.xlsx         (enriched Excel)
-echo     intel_report.md         (summary report)
+echo     data\checkpoints\scraped_urls.json       (checkpoint)
+echo     data\output\scraped_results.json    (raw results)
+echo     data\output\scraped_results.csv     (flat CSV)
+echo     data\output\*_ENRICHED.xlsx         (enriched Excel)
+echo     data\output\intel_report.md         (summary report)
 echo ============================================
 goto :EOF
 

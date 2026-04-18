@@ -19,8 +19,9 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-RESULTS_JSON = BASE_DIR / "scraped_results.json"
-REPORT_FILE = BASE_DIR / "intel_report.md"
+DATA_DIR = BASE_DIR / "data"
+RESULTS_JSON = DATA_DIR / "output" / "scraped_results.json"
+REPORT_FILE = DATA_DIR / "output" / "intel_report.md"
 
 DELIVERY_FLAGS = {
     "has_hungerstation": "HungerStation",

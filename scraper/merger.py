@@ -29,15 +29,16 @@ from scraper.utils import normalize_url
 # ── Paths ────────────────────────────────────────────────────────────────────
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-RESULTS_JSON = BASE_DIR / "scraped_results.json"
+DATA_DIR = BASE_DIR / "data"
+RESULTS_JSON = DATA_DIR / "output" / "scraped_results.json"
 
 EXCEL_FILES = [
-    BASE_DIR / "KSA_Merchants_Riyadh.xlsx",
-    BASE_DIR / "KSA_Merchants_Jeddah.xlsx",
-    BASE_DIR / "KSA_Merchants_Dammam.xlsx",
-    BASE_DIR / "KSA_Merchants_Khobar.xlsx",
-    BASE_DIR / "KSA_Merchants_Mecca.xlsx",
-    BASE_DIR / "KSA_Merchants_Medina.xlsx",
+    DATA_DIR / "input" / "KSA_Merchants_Riyadh.xlsx",
+    DATA_DIR / "input" / "KSA_Merchants_Jeddah.xlsx",
+    DATA_DIR / "input" / "KSA_Merchants_Dammam.xlsx",
+    DATA_DIR / "input" / "KSA_Merchants_Khobar.xlsx",
+    DATA_DIR / "input" / "KSA_Merchants_Mecca.xlsx",
+    DATA_DIR / "input" / "KSA_Merchants_Medina.xlsx",
 ]
 
 # New columns added to each sheet (in this order)
@@ -148,7 +149,7 @@ def build_lookup(results_path: Path) -> dict[str, dict[str, Any]]:
 # ── Excel enrichment ──────────────────────────────────────────────────────────
 
 def enrich_file(src: Path, lookup: dict[str, dict[str, Any]]) -> None:
-    dest = src.with_name(src.stem + "_ENRICHED.xlsx")
+    dest = DATA_DIR / "output" / (src.stem + "_ENRICHED.xlsx")
     print(f"  Processing {src.name} → {dest.name}")
 
     # Load with openpyxl to preserve formatting

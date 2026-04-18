@@ -1,0 +1,6 @@
+﻿geo_zone,merchant_count,avg_rating,avg_bd_score,total_reviews,unique_malls,tier1_count
+West Riyadh,1,4.0,73.22,554,1,0
+North Riyadh,550,4.26,70.41,1471364,20,231
+Central Riyadh,665,4.27,70.31,1794668,17,248
+East Riyadh,123,4.25,67.32,252768,14,32
+South Riyadh,46,4.33,64.42,43989,6,7

@@ -1,6 +1,5 @@
 .env
 .venv/
-output/
 _archive/
 *.log
 __pycache__/
@@ -11,9 +10,3 @@ node_modules/
 build/
 .next/
 dist/
-
-# Scraper Output & Checkpoints
-data/output/*
-!data/output/.gitkeep
-data/checkpoints/*
-!data/checkpoints/.gitkeep

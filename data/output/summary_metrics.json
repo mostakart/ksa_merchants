@@ -1,0 +1,147 @@
+{
+  "total_merchants": 2539,
+  "total_malls": 30,
+  "total_cities": 1,
+  "avg_rating": 4.3,
+  "median_reviews": 534.0,
+  "avg_bd_score": 60.98,
+  "pct_tier1": 12.6,
+  "pct_high_priority": 46.8,
+  "pct_positive_sentiment": 75.3,
+  "pct_with_phone": 25.9,
+  "merchants_multi_branch": 2072,
+  "merchants_delivery_mention": 36,
+  "whitespace_gaps": 3,
+  "tier_dist": {
+    "Tier 2": 1679,
+    "Tier 3": 540,
+    "Tier 1": 320
+  },
+  "category_dist": {
+    "Cafes": 932,
+    "Casual Dining": 688,
+    "Desserts & Sweets": 621,
+    "Fast Food": 298
+  },
+  "quadrant_dist": {
+    "⭐ Star": 772,
+    "💎 Hidden Gem": 692,
+    "❌ Weak": 558,
+    "⚠️ Risky": 500,
+    "Unknown": 17
+  },
+  "top10_bd_merchants": [
+    {
+      "merchant": "زيتون",
+      "mall": "الراشد ميغا مول المدينة المنورة",
+      "rating": 4.8,
+      "reviews": 34339,
+      "bd_priority_score": 88.04,
+      "tier": "Tier 1"
+    },
+    {
+      "merchant": "مطعم الجمیل",
+      "mall": "العروبة مول",
+      "rating": 4.8,
+      "reviews": 9824,
+      "bd_priority_score": 85.76,
+      "tier": "Tier 1"
+    },
+    {
+      "merchant": "محمود كباب",
+      "mall": "مجمع القارات",
+      "rating": 4.8,
+      "reviews": 3753,
+      "bd_priority_score": 84.0,
+      "tier": "Tier 1"
+    },
+    {
+      "merchant": "مقهى ومحمصة كفة - فرع الدائري",
+      "mall": "الراشد ميغا مول المدينة المنورة",
+      "rating": 4.5,
+      "reviews": 5589,
+      "bd_priority_score": 83.23,
+      "tier": "Tier 1"
+    },
+    {
+      "merchant": "زيتون",
+      "mall": "Cenomi Al Noor Mall | سينومي النور مول",
+      "rating": 4.8,
+      "reviews": 34339,
+      "bd_priority_score": 83.04,
+      "tier": "Tier 1"
+    },
+    {
+      "merchant": "زيتون",
+      "mall": "العروبة مول",
+      "rating": 4.8,
+      "reviews": 34339,
+      "bd_priority_score": 83.04,
+      "tier": "Tier 1"
+    },
+    {
+      "merchant": "زيتون",
+      "mall": "انوار المدينة مول",
+      "rating": 4.8,
+      "reviews": 34339,
+      "bd_priority_score": 83.04,
+      "tier": "Tier 1"
+    },
+    {
+      "merchant": "زيتون",
+      "mall": "مجمع القارات",
+      "rating": 4.8,
+      "reviews": 34339,
+      "bd_priority_score": 83.04,
+      "tier": "Tier 1"
+    },
+    {
+      "merchant": "زيتون",
+      "mall": "المنار مول",
+      "rating": 4.8,
+      "reviews": 34339,
+      "bd_priority_score": 83.04,
+      "tier": "Tier 1"
+    },
+    {
+      "merchant": "زيتون",
+      "mall": "Medina Boulevard",
+      "rating": 4.8,
+      "reviews": 34339,
+      "bd_priority_score": 83.04,
+      "tier": "Tier 1"
+    }
+  ],
+  "top5_malls_by_bd": [
+    {
+      "mall": "مركز المدينة المنورة",
+      "merchant_count": 122,
+      "avg_rating": 4.33,
+      "avg_bd_score": 64.21
+    },
+    {
+      "mall": "مجمع القارات",
+      "merchant_count": 84,
+      "avg_rating": 4.31,
+      "avg_bd_score": 64.01
+    },
+    {
+      "mall": "الحسن مول",
+      "merchant_count": 75,
+      "avg_rating": 4.33,
+      "avg_bd_score": 63.78
+    },
+    {
+      "mall": "مجمع القمه",
+      "merchant_count": 81,
+      "avg_rating": 4.35,
+      "avg_bd_score": 63.39
+    },
+    {
+      "mall": "Medina Boulevard",
+      "merchant_count": 97,
+      "avg_rating": 4.29,
+      "avg_bd_score": 62.96
+    }
+  ]
+}

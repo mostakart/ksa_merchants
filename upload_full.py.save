@@ -1,0 +1,96 @@
+cat > upload_full.py << 'EOF'
+import json, requests, time, sys
+
+SUPABASE_URL = "https://omowdfzyudedrtcuhnvy.supabase.co"
+SERVICE_KEY  = "YOUR_SERVICE_ROLE_KEY_HERE"
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9tb3dkZnp5dWRlZHJ0Y3VobnZ5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NjQzNjI3OCwiZXhwIjoyMDkyMDEyMjc4fQ.kgQTvZRIrgFXTwL5wDM5oYLmDS9GtRjltE53wcpDQes
+
+HEADERS = {
+    "apikey": SERVICE_KEY,
+    "Authorization": f"Bearer {SERVICE_KEY}",
+    "Content-Type": "application/json",
+    "Prefer": "return=minimal",
+}
+
+CITY_TABLE = {
+    "Riyadh": "merchants_riyadh",
+    "Jeddah": "merchants_jeddah",
+    "Dammam": "merchants_dammam",
+    "Khobar": "merchants_khobar",
+    "Mecca":  "merchants_mecca",
+    "Medina": "merchants_medina",
+}
+
+def clear(table):
+    r = requests.delete(f"{SUPABASE_URL}/rest/v1/{table}?id=not.is.null", headers=HEADERS)
+    print(f"  🗑️  Cleared {table} ({r.status_code})")
+
+def upload(records, table, batch=300):
+    ok = fail = 0
+    for i in range(0, len(records), batch):
+        b = records[i:i+batch]
+        r = requests.post(f"{SUPABASE_URL}/rest/v1/{table}", headers=HEADERS, json=b, timeout=60)
+        if r.status_code in (200,201): ok += len(b)
+        else: fail += len(b); print(f"  ❌ {r.status_code}: {r.text[:200]}")
+        print(f"  ✅ {ok}/{len(records)}", end="\r")
+        time.sleep(0.1)
+    print(f"\n  Done: {ok} ok | {fail} failed")
+
+def norm(m, city, mall):
+    def safe_int(v):
+        try: return int(float(str(v).replace(",",""))) if v not in (None,"","nan") else None
+        except: return None
+    def safe_float(v):
+        try: return float(v) if v not in (None,"","nan") else None
+        except: return None
+    return {
+        "merchant_name": str(m.get("merchant","")).strip() or None,
+        "mall":          str(mall).split("::")[-1].strip(),
+        "city":          city,
+        "category":      str(m.get("category","")).strip() or None,
+        "priority":      str(m.get("priority","")).strip() or None,
+        "rating":        str(m.get("rating","")).strip() or None,
+        "reviews_count": safe_int(m.get("total_reviews")),
+        "avg_price":     str(m.get("avg_price","")).strip() or None,
+        "branches_ksa":  safe_int(m.get("branches")),
+        "phone":         str(m.get("phone","")).strip() or None,
+        "website":       str(m.get("website","")).strip() or None,
+        "opening_hours": str(m.get("opening_hours","")).strip() or None,
+        "lat":           safe_float(m.get("lat")),
+        "lng":           safe_float(m.get("lng")),
+        "top_reviews":   str(m.get("reviews_text","")).strip() or None,
+    }
+
+if "YOUR_SERVICE_ROLE_KEY_HERE" in SERVICE_KEY:
+    print("❌ Set SERVICE_KEY first!"); sys.exit(1)
+
+print("Loading checkpoint…")
+with open("output/master_checkpoint.json") as f:
+    data = json.load(f)
+enriched = data["enriched"]
+
+# Group by city
+city_records = {c: [] for c in CITY_TABLE}
+for key, merchants in enriched.items():
+    city = key.split("::")[0]
+    if city in city_records:
+        for m in merchants:
+            city_records[city].append(norm(m, city, key))
+
+# Clear all tables first
+print("\n🗑️  Clearing all tables…")
+for table in CITY_TABLE.values():
+    clear(table)
+
+# Upload
+total = 0
+for city, table in CITY_TABLE.items():
+    recs = city_records[city]
+    print(f"\n📂 {city} → {table} ({len(recs):,} records)")
+    upload(recs, table)
+    total += len(recs)
+
+print(f"\n✅ Done! Total: {total:,}")
+EOF
+open -a TextEdit upload_full.py
+

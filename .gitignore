@@ -5,3 +5,17 @@ _archive/
 *.log
 __pycache__/
 .DS_Store
+
+# React Dashboard
+node_modules/
+build/
+.next/
+dist/
+
+# Scraper Output & Checkpoints
+scraped_urls.json
+scraped_results.json
+scraped_results.csv
+*_ENRICHED.xlsx
+intel_report.md
+*.tmp

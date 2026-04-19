@@ -132,6 +132,7 @@ function computeCityStats(merchants) {
   return r;
 }
 
+// eslint-disable-next-line no-unused-vars
 function price_to_range(level) {
   return {0:"10–20 SAR",1:"20–40 SAR",2:"40–80 SAR",3:"80–150 SAR",4:"150+ SAR"}[level] || "";
 }
@@ -439,6 +440,7 @@ function ProfilerTab({ merchants, anonKey, initialMerchant }) {
   const [showList, setShowList] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [semanticNames, setSemanticNames] = useState(null);
+  // eslint-disable-next-line no-unused-vars
   const [err, setErr] = useState("");
 
   const [modelReady, setModelReady] = useState(false);
@@ -539,6 +541,7 @@ function ProfilerTab({ merchants, anonKey, initialMerchant }) {
     return Array.from(map.values()).slice(0, 15);
   }, [query, merchants, merchantBranchesMap, semanticNames]);
 
+  // eslint-disable-next-line no-unused-vars
   const scoreColor = s => s >= 80 ? "#16A34A" : s >= 60 ? "#D97706" : C.accent;
 
   return (

@@ -732,25 +732,42 @@ function PipelineTab({ merchants, onMerchantClick }) {
         <KPI label="Closed Deals" value={closed} sub="This session" color="#15803D" />
       </div>
 
-      <div style={{ display: "flex", gap: 10, marginBottom: 14, alignItems: "center", flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: 14, marginBottom: 20, alignItems: "flex-end", flexWrap: "wrap" }}>
         {[
-          ["City", allCities, city, (v) => { setCity(v); setMall("All"); }],
-          ["Mall", allMalls, mall, setMall],
-          ["Priority", ["All", "High", "Medium", "Low", "Uncategorized"], prio, setPrio],
-          ["Category", allCategories, cat, setCat],
-          ["Price", allPrices, price, setPrice],
-          ["Hours", allHours, hours, setHours]
-        ].map(([label, opts, val, fn]) => (
-          <select key={label} value={val} onChange={e => fn(e.target.value)}
-            style={{ padding: "8px 10px", border: `1px solid ${C.border}`, borderRadius: 7, fontSize: 12, background: C.white, color: C.text, outline: "none", cursor: "pointer", maxWidth: 160 }}>
-            {opts.map((o, i) => <option key={i} value={o}>{i === 0 ? `${label}: All` : o.length > 25 ? o.substring(0, 25) + "..." : o}</option>)}
-          </select>
+          { label: "City", icon: "M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z", opts: allCities, val: city, fn: (v) => { setCity(v); setMall("All"); } },
+          { label: "Mall", icon: "M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z", opts: allMalls, val: mall, fn: setMall, placeholder: "Select Mall" },
+          { label: "Priority", icon: "M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z", opts: ["All", "High", "Medium", "Low", "Uncategorized"], val: prio, fn: setPrio },
+          { label: "Category", icon: "M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z", opts: allCategories, val: cat, fn: setCat },
+          { label: "Price", icon: "M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6", opts: allPrices, val: price, fn: setPrice },
+          { label: "Hours", icon: "M12 22a10 10 0 100-20 10 10 0 000 20z M12 6v6l4 2", opts: allHours, val: hours, fn: setHours },
+        ].map(({ label, icon, opts, val, fn, placeholder }) => (
+          <div key={label} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <label style={{ fontSize: 11, fontWeight: 600, color: C.muted, display: "flex", alignItems: "center", gap: 4, marginLeft: 2 }}>
+              <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+                <path d={icon} />
+                {label === "City" && <circle cx="12" cy="10" r="3" />}
+                {label === "Mall" && <path d="M3 6h18M16 10a4 4 0 01-8 0" />}
+              </label>
+              {label}
+            </label>
+            <select value={val} onChange={e => fn(e.target.value)}
+              style={{ padding: "8px 12px", border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 13, background: C.white, color: C.text, outline: "none", cursor: "pointer", minWidth: 140, boxShadow: "0 1px 2px rgba(0,0,0,0.05)" }}>
+              {opts.map((o, i) => (
+                <option key={i} value={o}>
+                  {o === "All" ? (placeholder || `${label}: All`) : (o.length > 25 ? o.substring(0, 25) + "..." : o)}
+                </option>
+              ))}
+            </select>
+          </div>
         ))}
-        <button onClick={() => { setCity("All"); setMall("All"); setPrio("All"); setCat("All"); setPrice("All"); setHours("All"); }}
-          style={{ padding: "7px 12px", background: "#F4F2EE", border: "none", borderRadius: 7, fontSize: 11, color: C.text, cursor: "pointer", fontWeight: 500 }}>
-          Clear Filters
-        </button>
-        <span style={{ marginLeft: "auto", fontSize: 12, color: C.muted }}>{filteredMerchants.length} matches</span>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <button onClick={() => { setCity("All"); setMall("All"); setPrio("All"); setCat("All"); setPrice("All"); setHours("All"); }}
+            style={{ padding: "8px 14px", background: "#F4F2EE", border: "none", borderRadius: 8, fontSize: 12, color: C.text, cursor: "pointer", fontWeight: 600, transition: "background .2s", height: 35 }}>
+            Clear Filters
+          </button>
+          <span style={{ fontSize: 12, color: C.muted, fontWeight: 500 }}>{filteredMerchants.length.toLocaleString()} matches</span>
+        </div>
       </div>
 
       <div style={{ background: C.white, borderRadius: 10, border: `1px solid ${C.border}`, overflow: "hidden" }}>

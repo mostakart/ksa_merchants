@@ -57,10 +57,23 @@ ENT_CATEGORIES = [
     ("ألعاب أطفال", "Entertainment"),
     ("سينما",      "Entertainment"),
     ("ترفيه",      "Entertainment"),
+    ("aqua park",  "Entertainment"),
+    ("water park", "Entertainment"),
+    ("حديقة مائية", "Entertainment"),
+    ("padel",      "Entertainment"),
+    ("trampoline", "Entertainment"),
+    ("vr gaming",  "Entertainment"),
+]
+
+RETAIL_CATEGORIES = [
+    ("perfume",    "Retail - Perfumes"),
+    ("fragrance",  "Retail - Perfumes"),
+    ("عطور",       "Retail - Perfumes"),
+    ("بخور",       "Retail - Perfumes"),
 ]
 
 # القائمة الموحدة للبحث
-SEARCH_CATEGORIES = FB_CATEGORIES + ENT_CATEGORIES
+SEARCH_CATEGORIES = FB_CATEGORIES + ENT_CATEGORIES + RETAIL_CATEGORIES
 
 # المولات الناقصة (Google مرجعهاش في الـ 20 الأولى)
 MISSING_MALLS = {
@@ -91,7 +104,7 @@ COST_PER = {"text_search":0.032, "place_details":0.017, "contact":0.003, "gemini
 
 POSITIVE_KEYWORDS = ["لذيذ","لذيذة","رائع","رائعة","ممتاز","ممتازة","جميل","جميلة","نظيف","نظيفة","سريع","سريعة","مذهل","إبداع","طازج","طازجة","هادئ","مريح","أنصح","ننصح","أفضل","أحسن","جودة","يستاهل","احترافي","متميز","خدمة ممتازة","تجربة رائعة","تنوع","كرم","شهي","مبدع"]
 NEGATIVE_KEYWORDS = ["بطيء","بطيئة","انتظار","غالي","غالية","سيء","سيئة","مزعج","بارد","باردة","ضوضاء","صغير","ضيق","مشكلة","شكوى","خيبة","متأخر","قديم","قذر","مكلف","مخيب","لا أنصح","لا ننصح","مؤسف","أسعار مرتفعة","جودة رديئة","لن أعود","ما أرجع","ضعيف","بدون طعم","رديء","فوضى","تأخر"]
-CATEGORY_PRICE_DEFAULTS = {"Casual Dining":65.0,"Fast Food":35.0,"Cafes":45.0,"Desserts & Sweets":30.0,"Entertainment":75.0,"Other":50.0}
+CATEGORY_PRICE_DEFAULTS = {"Casual Dining":65.0,"Fast Food":35.0,"Cafes":45.0,"Desserts & Sweets":30.0,"Entertainment":75.0,"Retail - Perfumes":150.0,"Other":50.0}
 
 # ── LOGGING ───────────────────────────────────────────────────────────────────
 OUTPUT_DIR.mkdir(exist_ok=True)
@@ -420,7 +433,15 @@ def export_excel(all_enriched, output_path):
     from openpyxl.utils import get_column_letter
 
     PRI_COLORS = {"🔴 High":"FFFF4444","🟡 Medium":"FFFFFF88","🟢 Low":"FF88FF88"}
-    CAT_COLORS = {"Casual Dining":"FF4A86E8","Fast Food":"FF6AA84F","Cafes":"FF9FC5E8","Desserts & Sweets":"FFFF9900","Other":"FFFFFFFF"}
+    CAT_COLORS = {
+        "Casual Dining":"FF4A86E8",
+        "Fast Food":"FF6AA84F",
+        "Cafes":"FF9FC5E8",
+        "Desserts & Sweets":"FFFF9900",
+        "Entertainment":"FFC27BA0",
+        "Retail - Perfumes":"FFD5A6BD",
+        "Other":"FFFFFFFF"
+    }
     COLUMNS = [("Priority",12),("Category",14),("Merchant",28),("Mall",22),("City",10),
                ("Rating",8),("Reviews",10),("Avg Price",14),("Branches (KSA)",14),
                ("Phone",18),("Website",30),("Opening Hours",45),("Lat",12),("Lng",12),("Top Reviews",70)]

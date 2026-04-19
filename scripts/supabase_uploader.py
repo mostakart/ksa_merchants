@@ -204,9 +204,18 @@ def main():
         print("    Location: Supabase → Settings → API → service_role (secret)")
         sys.exit(1)
 
-    # Find available Excel files
-    found   = [(f, t) for f, t in FILES.items() if Path(f).exists()]
-    missing = [f for f in FILES if not Path(f).exists()]
+    # Find available Excel files (check root and output/ dir)
+    output_dir = Path("output")
+    found = []
+    missing = []
+    
+    for f, t in FILES.items():
+        if Path(f).exists():
+            found.append((f, t))
+        elif (output_dir / f).exists():
+            found.append((str(output_dir / f), t))
+        else:
+            missing.append(f)
 
     if missing:
         print(f"⚠️  Files not found (will skip):")

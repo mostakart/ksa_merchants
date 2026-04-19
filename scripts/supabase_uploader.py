@@ -16,6 +16,11 @@ import json
 import time
 import sys
 from pathlib import Path
+import os, io
+if sys.platform == "win32":
+    os.system('chcp 65001 > nul')
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', line_buffering=True)
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', line_buffering=True)
 
 # ═══════════════════════════════════════════════════
 # CONFIG — Edit before running
@@ -142,8 +147,9 @@ def process(filepath, table):
     print(f"\n{'─' * 55}")
     print(f"  📂  {filepath}  →  {table}")
 
-    # Read all columns as string to avoid type coercion issues
-    df = pd.read_excel(filepath, dtype=str)
+    # Read all sheets and concatenate them
+    all_sheets = pd.read_excel(filepath, sheet_name=None, dtype=str)
+    df = pd.concat(all_sheets.values(), ignore_index=True)
     print(f"  Rows loaded : {len(df)}")
     print(f"  Columns     : {list(df.columns)}")
 

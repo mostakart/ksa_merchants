@@ -80,9 +80,8 @@ RETAIL_CATEGORIES = [
     ("بخور",       "Retail - Perfumes"),
 ]
 
-# القائمة الموحدة للبحث (Filtered for Entertainment & Retail only as requested)
-SEARCH_CATEGORIES = ENT_CATEGORIES + RETAIL_CATEGORIES
-# FB_CATEGORIES = [...] # Skipped for now
+# القائمة الموحدة للبحث (Now including Food & Beverage + Entertainment + Retail)
+SEARCH_CATEGORIES = FB_CATEGORIES + ENT_CATEGORIES + RETAIL_CATEGORIES
 
 # المولات الناقصة (Google مرجعهاش في الـ 20 الأولى)
 MISSING_MALLS = {
@@ -400,8 +399,8 @@ def process_mall(mall, city_name, state, start_time):
         print(f"      ⚠️  No merchants found")
         return
 
-    # Filter out merchants already fully processed in this mall to save costs
-    processed_pids = {m["place_id"] for m in existing_merchants if m.get("p2_status") == "OK"}
+    # Filter out merchants already seen in this mall (any record with a place_id counts)
+    processed_pids = {m["place_id"] for m in existing_merchants if m.get("place_id")}
     new_merchants = [m for m in merchants if m["place_id"] not in processed_pids]
 
     if not new_merchants:

@@ -1,179 +1,175 @@
 {
-  "total_merchants": 3650,
-  "total_malls": 22,
+  "total_merchants": 2061,
+  "total_malls": 30,
   "total_cities": 1,
-  "avg_rating": 4.27,
-  "median_reviews": 379.0,
-  "avg_bd_score": 59.17,
-  "pct_tier1": 6.8,
-  "pct_high_priority": 35.9,
-  "pct_positive_sentiment": 74.4,
-  "pct_with_phone": 41.5,
-  "merchants_multi_branch": 2564,
-  "merchants_delivery_mention": 46,
-  "whitespace_gaps": 5,
+  "avg_rating": 4.23,
+  "median_reviews": 210.0,
+  "avg_bd_score": 59.98,
+  "pct_tier1": 7.0,
+  "pct_high_priority": 32.4,
+  "pct_positive_sentiment": 69.2,
+  "pct_with_phone": 22.9,
+  "merchants_multi_branch": 1730,
+  "merchants_delivery_mention": 22,
+  "whitespace_gaps": 2,
   "tier_dist": {
-    "Tier 2": 2673,
-    "Tier 3": 728,
-    "Tier 1": 249
+    "Tier 2": 1506,
+    "Tier 3": 411,
+    "Tier 1": 144
   },
   "category_dist": {
-    "Entertainment": 1631,
-    "Cafes": 509,
-    "Casual Dining": 469,
-    "Desserts & Sweets": 465,
-    "Retail - Perfumes": 440,
-    "Fast Food": 136
+    "Entertainment": 1589,
+    "Retail - Perfumes": 472
   },
   "quadrant_dist": {
-    "⭐ Star": 1099,
-    "💎 Hidden Gem": 951,
-    "❌ Weak": 856,
-    "⚠️ Risky": 731,
-    "Unknown": 13
+    "💎 Hidden Gem": 685,
+    "⚠️ Risky": 543,
+    "⭐ Star": 495,
+    "❌ Weak": 329,
+    "Unknown": 9
   },
   "top10_bd_merchants": [
     {
-      "merchant": "بوليفارد وورلد",
-      "mall": "الرياض بارك",
-      "rating": 4.7,
-      "reviews": 48331,
-      "bd_priority_score": 84.37,
-      "tier": "Tier 1"
-    },
-    {
-      "merchant": "حديقة الوطن",
-      "mall": "الرياض بارك",
-      "rating": 4.2,
-      "reviews": 13550,
-      "bd_priority_score": 83.05,
-      "tier": "Tier 1"
-    },
-    {
-      "merchant": "فوكس سينما",
-      "mall": "الرياض جاليري",
+      "merchant": "العثيم مول | الدمام",
+      "mall": "العثيم مول | الدمام",
       "rating": 4.3,
-      "reviews": 8344,
-      "bd_priority_score": 82.68,
+      "reviews": 30442,
+      "bd_priority_score": 83.18,
+      "tier": "Tier 1"
+    },
+    {
+      "merchant": "شركة زهرة نواعم للعطور",
+      "mall": "العثيم مول | الدمام",
+      "rating": 4.8,
+      "reviews": 136,
+      "bd_priority_score": 81.95,
+      "tier": "Tier 1"
+    },
+    {
+      "merchant": "عالم المغامرات",
+      "mall": "العثيم مول | الدمام",
+      "rating": 4.2,
+      "reviews": 5472,
+      "bd_priority_score": 81.83,
       "tier": "Tier 1"
     },
     {
       "merchant": "ڤوكس سينما",
-      "mall": "سنتريا مول",
-      "rating": 4.3,
-      "reviews": 5160,
-      "bd_priority_score": 81.82,
+      "mall": "العثيم مول | الدمام",
+      "rating": 4.1,
+      "reviews": 6233,
+      "bd_priority_score": 81.57,
       "tier": "Tier 1"
     },
     {
-      "merchant": "بلو باي بولينج (فرع حطين)",
-      "mall": "الرياض جاليري",
-      "rating": 4.8,
-      "reviews": 2337,
-      "bd_priority_score": 81.75,
-      "tier": "Tier 1"
-    },
-    {
-      "merchant": "الرياض بارك",
-      "mall": "الرياض بارك",
+      "merchant": "النخيل مول الدمام",
+      "mall": "العثيم مول | الدمام",
       "rating": 4.5,
-      "reviews": 41683,
-      "bd_priority_score": 81.56,
+      "reviews": 24022,
+      "bd_priority_score": 81.05,
       "tier": "Tier 1"
     },
     {
-      "merchant": "الرياض بارك",
-      "mall": "الرياض جاليري",
+      "merchant": "النخيل مول الدمام",
+      "mall": "النخيل مول الدمام",
       "rating": 4.5,
-      "reviews": 41683,
-      "bd_priority_score": 81.56,
+      "reviews": 24022,
+      "bd_priority_score": 81.05,
       "tier": "Tier 1"
     },
     {
-      "merchant": "الرياض بارك",
-      "mall": "سينومي ذا ڤيو موّل",
+      "merchant": "النخيل مول الدمام",
+      "mall": "وست افنيو مول",
       "rating": 4.5,
-      "reviews": 41683,
-      "bd_priority_score": 81.56,
+      "reviews": 24022,
+      "bd_priority_score": 81.05,
       "tier": "Tier 1"
     },
     {
-      "merchant": "الرياض بارك",
-      "mall": "سنتريا مول",
+      "merchant": "النخيل مول الدمام",
+      "mall": "الحياة بلازا",
       "rating": 4.5,
-      "reviews": 41683,
-      "bd_priority_score": 81.56,
+      "reviews": 24022,
+      "bd_priority_score": 81.05,
       "tier": "Tier 1"
     },
     {
-      "merchant": "الرياض بارك",
-      "mall": "واجهة روشن - منطقة التسوق",
+      "merchant": "النخيل مول الدمام",
+      "mall": "دارين مول",
       "rating": 4.5,
-      "reviews": 41683,
-      "bd_priority_score": 81.56,
+      "reviews": 24022,
+      "bd_priority_score": 81.05,
+      "tier": "Tier 1"
+    },
+    {
+      "merchant": "النخيل مول الدمام",
+      "mall": "مارينا مول",
+      "rating": 4.5,
+      "reviews": 24022,
+      "bd_priority_score": 81.05,
       "tier": "Tier 1"
     }
   ],
   "top10_malls_by_bd": [
     {
-      "mall": "سنتريا مول",
-      "merchant_count": 169,
-      "avg_rating": 4.28,
-      "avg_bd_score": 61.81
+      "mall": "Mall Al Firdaws",
+      "merchant_count": 32,
+      "avg_rating": 4.2,
+      "avg_bd_score": 65.44
     },
     {
-      "mall": "صحارى مول",
-      "merchant_count": 137,
-      "avg_rating": 4.33,
-      "avg_bd_score": 61.81
+      "mall": "اللؤلؤة مول",
+      "merchant_count": 32,
+      "avg_rating": 4.21,
+      "avg_bd_score": 63.26
     },
     {
-      "mall": "واجهة روشن - منطقة التسوق",
-      "merchant_count": 148,
-      "avg_rating": 4.27,
-      "avg_bd_score": 61.42
+      "mall": "مركز المحمل التجاري",
+      "merchant_count": 74,
+      "avg_rating": 4.24,
+      "avg_bd_score": 63.24
     },
     {
-      "mall": "الرياض بارك",
-      "merchant_count": 163,
-      "avg_rating": 4.28,
-      "avg_bd_score": 61.21
+      "mall": "Rawdah Square",
+      "merchant_count": 81,
+      "avg_rating": 4.26,
+      "avg_bd_score": 63.0
     },
     {
-      "mall": "سينومي ذا ڤيو موّل",
-      "merchant_count": 150,
-      "avg_rating": 4.31,
-      "avg_bd_score": 60.74
+      "mall": "الشاطئ مول",
+      "merchant_count": 89,
+      "avg_rating": 4.19,
+      "avg_bd_score": 62.78
     },
     {
-      "mall": "الرياض جاليري",
-      "merchant_count": 211,
-      "avg_rating": 4.3,
-      "avg_bd_score": 60.67
+      "mall": "مارينا مول",
+      "merchant_count": 68,
+      "avg_rating": 4.22,
+      "avg_bd_score": 62.43
     },
     {
-      "mall": "ذا زون",
-      "merchant_count": 176,
-      "avg_rating": 4.34,
-      "avg_bd_score": 60.55
+      "mall": "مجمع الواحة داون تاون",
+      "merchant_count": 14,
+      "avg_rating": 4.29,
+      "avg_bd_score": 62.05
     },
     {
-      "mall": "بانوراما مول",
-      "merchant_count": 133,
-      "avg_rating": 4.33,
-      "avg_bd_score": 60.23
+      "mall": "توب سنتر الدمام",
+      "merchant_count": 55,
+      "avg_rating": 4.16,
+      "avg_bd_score": 61.74
     },
     {
-      "mall": "رياض افنيو مول",
-      "merchant_count": 206,
-      "avg_rating": 4.28,
-      "avg_bd_score": 60.13
+      "mall": "وست افنيو مول",
+      "merchant_count": 57,
+      "avg_rating": 4.25,
+      "avg_bd_score": 61.57
     },
     {
-      "mall": "الفيصلية مول",
-      "merchant_count": 108,
-      "avg_rating": 4.28,
-      "avg_bd_score": 60.01
+      "mall": "العثيم مول | الدمام",
+      "merchant_count": 106,
+      "avg_rating": 4.18,
+      "avg_bd_score": 61.52
     }
   ]
 }

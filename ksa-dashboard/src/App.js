@@ -747,7 +747,7 @@ function PipelineTab({ merchants, onMerchantClick }) {
                 <path d={icon} />
                 {label === "City" && <circle cx="12" cy="10" r="3" />}
                 {label === "Mall" && <path d="M3 6h18M16 10a4 4 0 01-8 0" />}
-              </label>
+              </svg>
               {label}
             </label>
             <select value={val} onChange={e => fn(e.target.value)}

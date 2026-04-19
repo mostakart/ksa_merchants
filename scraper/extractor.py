@@ -1,17 +1,23 @@
 """
 Core extraction logic: fetch a URL, parse HTML, return MerchantWebIntel.
+
+Uses requests (sync) via asyncio.to_thread so TCP-level hangs are bounded
+by socket.setdefaulttimeout() rather than relying on asyncio cancellation,
+which doesn't reliably interrupt blocking C-level socket operations.
 """
 
 from __future__ import annotations
 
+import asyncio
 import re
+import socket
 import time
 from datetime import datetime, timezone
 from typing import Optional
 from urllib.parse import urlparse, urljoin
 
 import json
-import httpx
+import requests
 from bs4 import BeautifulSoup
 from pydantic import BaseModel
 
@@ -36,7 +42,9 @@ HEADERS = {
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
 }
 
-TIMEOUT = 15.0
+CONNECT_TIMEOUT = 6.0   # seconds to establish TCP connection
+READ_TIMEOUT = 12.0     # seconds to read response
+SOCKET_TIMEOUT = 20.0   # hard OS-level fallback for TCP hangs
 
 DELIVERY_DOMAINS = {
     "has_hungerstation": "hungerstation.com",
@@ -141,25 +149,25 @@ class MerchantWebIntel(BaseModel):
 
     # Growth
     has_careers_page: bool = False
-    
+
     # Marketing Pixels
     has_facebook_pixel: bool = False
     has_tiktok_pixel: bool = False
     has_snapchat_pixel: bool = False
     has_google_ads: bool = False
     active_pixels: list = []
-    
+
     # Business Ops
     footer_copyright_year: Optional[int] = None
     site_is_maintained: bool = False
     schema_price_range: Optional[str] = None
     schema_cuisine_type: Optional[str] = None
     schema_aggregate_rating: Optional[float] = None
-    
+
     # CRM
     has_email_signup: bool = False
     crm_platform: Optional[str] = None
-    
+
     # Tech Stack
     cms_platform: Optional[str] = None
     uses_cloudflare: bool = False
@@ -187,24 +195,29 @@ class MerchantWebIntel(BaseModel):
     error: Optional[str] = None
 
 
-# ── HTTP client factory ──────────────────────────────────────────────────────
+# ── HTTP session factory ─────────────────────────────────────────────────────
 
-def _make_client(verify: bool = True) -> httpx.AsyncClient:
-    return httpx.AsyncClient(
-        headers=HEADERS,
-        timeout=TIMEOUT,
-        follow_redirects=True,
-        verify=verify,
-        limits=httpx.Limits(max_connections=30, max_keepalive_connections=10),
-    )
+def _make_session(verify: bool = True) -> requests.Session:
+    session = requests.Session()
+    session.headers.update(HEADERS)
+    session.max_redirects = 5
+    adapter = requests.adapters.HTTPAdapter(max_retries=0)
+    session.mount("http://", adapter)
+    session.mount("https://", adapter)
+    return session
 
 
-# ── Core fetch ───────────────────────────────────────────────────────────────
+# ── Core fetch (sync) ────────────────────────────────────────────────────────
 
-async def _fetch(client: httpx.AsyncClient, url: str) -> tuple:
-    """Returns (response, load_time_ms)."""
+def _sync_fetch(session: requests.Session, url: str, verify: bool = True) -> tuple:
+    """Returns (response, load_time_ms). Raises on error."""
     t0 = time.monotonic()
-    resp = await client.get(url)
+    resp = session.get(
+        url,
+        timeout=(CONNECT_TIMEOUT, READ_TIMEOUT),
+        verify=verify,
+        allow_redirects=True,
+    )
     elapsed = int((time.monotonic() - t0) * 1000)
     return resp, elapsed
 
@@ -335,24 +348,24 @@ def _parse(html: str, base_url: str, status_code: int, load_ms: int,
     # Logo
     logo_url = None
     logo_source = None
-    
+
     og_img = soup.find("meta", property="og:image")
     if og_img and og_img.get("content"):
         logo_url = urljoin(base_url, og_img["content"].strip())
         logo_source = "og:image"
-    
+
     if not logo_url:
         apple_icon = soup.find("link", rel=re.compile(r"apple-touch-icon", re.I))
         if apple_icon and apple_icon.get("href"):
             logo_url = urljoin(base_url, apple_icon["href"].strip())
             logo_source = "apple_touch_icon"
-            
+
     if not logo_url:
         icon = soup.find("link", rel=re.compile(r"icon", re.I))
         if icon and icon.get("href"):
             logo_url = urljoin(base_url, icon["href"].strip())
             logo_source = "link_icon"
-            
+
     if not logo_url:
         for img in soup.find_all("img"):
             cls = " ".join(img.get("class", [])).lower()
@@ -365,7 +378,7 @@ def _parse(html: str, base_url: str, status_code: int, load_ms: int,
 
     # Advanced Extraction
     uses_cloudflare = "cloudflare" in headers.get("server", "").lower()
-    
+
     cms_platform = None
     if "wp-content" in combined_text or "WordPress" in combined_text:
         cms_platform = "wordpress"
@@ -375,16 +388,16 @@ def _parse(html: str, base_url: str, status_code: int, load_ms: int,
         cms_platform = "wix"
     elif "squarespace.com" in combined_text:
         cms_platform = "squarespace"
-        
+
     has_ecommerce_engine = bool(
         ECOMMERCE_SALLA.search(combined_text) or
         ECOMMERCE_ZID.search(combined_text) or
         ECOMMERCE_WOO.search(combined_text) or
         cms_platform == "shopify"
     )
-    
+
     has_careers_page = any(CAREERS_KEYWORDS.search(lnk) for lnk in links)
-    
+
     has_facebook_pixel = bool(PIXEL_FB.search(combined_text))
     has_tiktok_pixel = bool(PIXEL_TIKTOK.search(combined_text))
     has_snapchat_pixel = bool(PIXEL_SNAP.search(combined_text))
@@ -394,7 +407,7 @@ def _parse(html: str, base_url: str, status_code: int, load_ms: int,
     if has_tiktok_pixel: active_pixels.append("tiktok")
     if has_snapchat_pixel: active_pixels.append("snapchat")
     if has_google_ads: active_pixels.append("google_ads")
-    
+
     footer_copyright_year = None
     copy_match = COPYRIGHT_YEAR.search(combined_text[-50000:])
     if copy_match:
@@ -402,7 +415,7 @@ def _parse(html: str, base_url: str, status_code: int, load_ms: int,
             footer_copyright_year = int(copy_match.group(1))
         except: pass
     site_is_maintained = (footer_copyright_year is not None and footer_copyright_year >= 2023)
-    
+
     payments = []
     if PAYMENT_APPLE.search(combined_text): payments.append("Apple Pay")
     if PAYMENT_STC.search(combined_text): payments.append("STC Pay")
@@ -410,12 +423,12 @@ def _parse(html: str, base_url: str, status_code: int, load_ms: int,
     if PAYMENT_TABBY.search(combined_text): payments.append("Tabby")
     if PAYMENT_TAMARA.search(combined_text): payments.append("Tamara")
     has_online_ordering = bool(ONLINE_ORDERING.search(combined_text))
-    
-    has_email_signup = bool(re.search(r'type=["\']email["\']', combined_text, re.I) and 
+
+    has_email_signup = bool(re.search(r'type=["\']email["\']', combined_text, re.I) and
                             re.search(r'subscribe|newsletter|اشترك|نشرة', combined_text, re.I))
     crm_match = CRM_KEYWORDS.search(combined_text)
     crm_platform = crm_match.group(0).lower() if crm_match else None
-    
+
     schema_price_range = None
     schema_cuisine_type = None
     schema_aggregate_rating = None
@@ -514,58 +527,70 @@ def _parse(html: str, base_url: str, status_code: int, load_ms: int,
     )
 
 
+# ── Sync scrape (runs in a thread) ───────────────────────────────────────────
+
+def _scrape_sync(url: str, merchant_name: str) -> MerchantWebIntel:
+    """
+    Synchronous scrape, meant to run inside asyncio.to_thread().
+    socket.setdefaulttimeout() bounds TCP-level hangs that bypass requests timeout.
+    """
+    original_url = normalize_url(url)
+    old_timeout = socket.getdefaulttimeout()
+    socket.setdefaulttimeout(SOCKET_TIMEOUT)
+    try:
+        return _attempt_sync(original_url, merchant_name, verify=True)
+    except Exception as exc:
+        exc_str = str(exc).lower()
+        if any(k in exc_str for k in ("ssl", "certificate", "cert", "[ssl]")):
+            try:
+                return _attempt_sync(original_url, merchant_name, verify=False)
+            except Exception as exc2:
+                return _error_result(original_url, merchant_name, str(exc2))
+        return _error_result(original_url, merchant_name, str(exc))
+    finally:
+        socket.setdefaulttimeout(old_timeout)
+
+
+def _attempt_sync(url: str, merchant_name: str, verify: bool) -> MerchantWebIntel:
+    with _make_session(verify=verify) as session:
+        resp, load_ms = _sync_fetch(session, url, verify=verify)
+        final_url = resp.url
+        html = resp.text[:500000]
+
+        extra_html = ""
+        soup_tmp = BeautifulSoup(html, "lxml")
+        links_tmp = _harvest_links(soup_tmp, final_url)
+        menu_link = _find_menu_link(links_tmp, final_url)
+        if menu_link and menu_link != final_url:
+            try:
+                menu_resp, _ = _sync_fetch(session, menu_link, verify=verify)
+                if 200 <= menu_resp.status_code < 300:
+                    extra_html = menu_resp.text[:500000]
+            except Exception:
+                pass
+
+        return _parse(
+            html=html,
+            base_url=final_url,
+            status_code=resp.status_code,
+            load_ms=load_ms,
+            final_url=final_url,
+            merchant_name=merchant_name,
+            original_url=url,
+            extra_html=extra_html,
+            headers=dict(resp.headers),
+        )
+
+
 # ── Public API ───────────────────────────────────────────────────────────────
 
 async def scrape(url: str, merchant_name: str = "") -> MerchantWebIntel:
     """
-    Fetch URL, extract intel. Returns MerchantWebIntel with error set on failure.
-    Never raises — all exceptions are caught.
+    Async entry point. Delegates to _scrape_sync in a thread pool so
+    TCP-level hangs don't block the event loop and are bounded by
+    socket.setdefaulttimeout().
     """
-    original_url = normalize_url(url)
-
-    async def _attempt(verify: bool) -> MerchantWebIntel:
-        async with _make_client(verify=verify) as client:
-            resp, load_ms = await _fetch(client, original_url)
-            final_url = str(resp.url)
-            html = resp.text[:500000]
-
-            extra_html = ""
-            soup_tmp = BeautifulSoup(html, "lxml")
-            links_tmp = _harvest_links(soup_tmp, final_url)
-            menu_link = _find_menu_link(links_tmp, final_url)
-            if menu_link and menu_link != final_url:
-                try:
-                    menu_resp, _ = await _fetch(client, menu_link)
-                    if 200 <= menu_resp.status_code < 300:
-                        extra_html = menu_resp.text[:500000]
-                except Exception:
-                    pass
-
-            return _parse(
-                html=html,
-                base_url=final_url,
-                status_code=resp.status_code,
-                load_ms=load_ms,
-                final_url=final_url,
-                merchant_name=merchant_name,
-                original_url=original_url,
-                extra_html=extra_html,
-                headers=dict(resp.headers)
-            )
-
-    try:
-        return await _attempt(verify=True)
-    except Exception as exc:
-        exc_str = str(exc).lower()
-        # Retry without SSL verification for cert errors
-        if any(k in exc_str for k in ("ssl", "certificate", "cert", "[ssl]")):
-            try:
-                return await _attempt(verify=False)
-            except Exception as exc2:
-                return _error_result(original_url, merchant_name, str(exc2))
-        if "timeout" in exc_str or isinstance(exc, httpx.TimeoutException):
-            return _error_result(original_url, merchant_name, "timeout")
-        return _error_result(original_url, merchant_name, str(exc))
+    return await asyncio.to_thread(_scrape_sync, url, merchant_name)
 
 
 def _error_result(url: str, merchant_name: str, error: str) -> MerchantWebIntel:

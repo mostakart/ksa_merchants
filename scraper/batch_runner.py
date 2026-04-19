@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import concurrent.futures
 import json
 import os
 import sys
@@ -121,12 +122,14 @@ class RateLimiter:
         self._last = 0.0
 
     async def acquire(self) -> None:
+        # Reserve the next slot under the lock, then sleep outside it
+        # so other workers aren't serialized waiting for the lock to release
         async with self._lock:
             now = time.monotonic()
-            wait = self._interval - (now - self._last)
-            if wait > 0:
-                await asyncio.sleep(wait)
-            self._last = time.monotonic()
+            wait = max(0.0, self._interval - (now - self._last))
+            self._last = now + wait  # reserve slot
+        if wait:
+            await asyncio.sleep(wait)
 
 
 # ── Batch processor ───────────────────────────────────────────────────────────
@@ -135,23 +138,25 @@ async def process_batch(
     batch: list[tuple[str, str]],  # [(url, merchant_name), ...]
     checkpoint: dict[str, Any],
     rate_limiter: RateLimiter,
+    sem: asyncio.Semaphore,
     pbar: tqdm,
     counters: dict[str, int],
 ) -> None:
     async def worker(url: str, merchant_name: str) -> None:
-        await rate_limiter.acquire()
-        try:
-            intel = await asyncio.wait_for(scrape(url, merchant_name), timeout=30.0)
-        except Exception as exc:
-            from scraper.extractor import MerchantWebIntel
-            intel = MerchantWebIntel(
-                merchant_name=merchant_name,
-                website_url=url,
-                scraped_at=datetime.now(timezone.utc).isoformat(),
-                status_code=0,
-                is_alive=False,
-                error=f"Timeout or fatal error: {exc}"
-            )
+        async with sem:
+            await rate_limiter.acquire()
+            try:
+                intel = await asyncio.wait_for(scrape(url, merchant_name), timeout=40.0)
+            except Exception as exc:
+                from scraper.extractor import MerchantWebIntel
+                intel = MerchantWebIntel(
+                    merchant_name=merchant_name,
+                    website_url=url,
+                    scraped_at=datetime.now(timezone.utc).isoformat(),
+                    status_code=0,
+                    is_alive=False,
+                    error=f"Timeout or fatal error: {exc}"
+                )
         entry = {
             "status": "done" if intel.is_alive else ("error" if intel.error else "done"),
             "result": intel.model_dump(),
@@ -219,6 +224,10 @@ async def main(concurrency: int = 20, rps: float = 5.0, batch_size: int = 20) ->
     counters = {"done": len(already_done), "errors": 0, "skipped": 0}
     sem = asyncio.Semaphore(concurrency)
 
+    # Thread pool for asyncio.to_thread calls inside scrape()
+    executor = concurrent.futures.ThreadPoolExecutor(max_workers=concurrency + 5)
+    asyncio.get_event_loop().set_default_executor(executor)
+
     # Wrap each url with its primary merchant name for the scraper
     def primary_name(url: str) -> str:
         metas = url_map.get(url, [])
@@ -232,7 +241,7 @@ async def main(concurrency: int = 20, rps: float = 5.0, batch_size: int = 20) ->
         for i in range(0, len(pending_with_names), batch_size):
             batch = pending_with_names[i: i + batch_size]
 
-            await process_batch(batch, checkpoint, rate_limiter, pbar, counters)
+            await process_batch(batch, checkpoint, rate_limiter, sem, pbar, counters)
 
             # Checkpoint after every batch
             save_checkpoint(checkpoint)

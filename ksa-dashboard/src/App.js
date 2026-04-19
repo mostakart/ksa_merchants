@@ -834,6 +834,244 @@ function PipelineTab({ merchants, onMerchantClick }) {
   );
 }
 
+/* ─── MALLS PROFILE TAB ──────────────────────────────────────── */
+function MallsTab({ merchants, onMerchantClick }) {
+  const [cityFilter, setCityFilter] = useState("All");
+  const [search, setSearch] = useState("");
+  const [sortBy, setSortBy] = useState("merchants"); // merchants | rating | reviews
+  const [selectedMall, setSelectedMall] = useState(null);
+  const [statuses, setStatuses] = useState({});
+
+  // Aggregate malls data
+  const mallsData = useMemo(() => {
+    const map = {};
+    for (const m of merchants) {
+      if (!m.Mall) continue;
+      if (!map[m.Mall]) {
+        map[m.Mall] = {
+          name: m.Mall,
+          city: m.City,
+          merchants: 0,
+          ratingSum: 0,
+          ratingCount: 0,
+          reviewsTotal: 0,
+          categories: {},
+          highCount: 0,
+        };
+      }
+      const d = map[m.Mall];
+      d.merchants++;
+      if (m.Rating > 0) { d.ratingSum += m.Rating; d.ratingCount++; }
+      d.reviewsTotal += m.Reviews || 0;
+      if (m.Category) d.categories[m.Category] = (d.categories[m.Category] || 0) + 1;
+      if (m.Priority.toLowerCase().includes("high")) d.highCount++;
+    }
+    return Object.values(map).map(d => ({
+      ...d,
+      avgRating: d.ratingCount ? +(d.ratingSum / d.ratingCount).toFixed(1) : 0,
+      topCategory: Object.entries(d.categories).sort((a, b) => b[1] - a[1])[0]?.[0] || "—",
+    }));
+  }, [merchants]);
+
+  const allCities = useMemo(() => ["All", ...new Set(mallsData.map(m => m.city).filter(Boolean)).values()].sort(), [mallsData]);
+
+  const filtered = useMemo(() => {
+    let list = mallsData;
+    if (cityFilter !== "All") list = list.filter(m => m.city === cityFilter);
+    if (search.trim()) list = list.filter(m => m.name.toLowerCase().includes(search.toLowerCase()));
+    return [...list].sort((a, b) => {
+      if (sortBy === "rating") return b.avgRating - a.avgRating;
+      if (sortBy === "reviews") return b.reviewsTotal - a.reviewsTotal;
+      return b.merchants - a.merchants;
+    });
+  }, [mallsData, cityFilter, search, sortBy]);
+
+  // ── Mall Detail View ──
+  if (selectedMall) {
+    const mallMerchants = merchants.filter(m => m.Mall === selectedMall.name);
+    const statusStyles = {
+      "Uncontacted": { background: "#F4F2EE", color: C.sub },
+      "Contacted": { background: "#EFF6FF", color: "#1D4ED8" },
+      "In Progress": { background: "#FEF3C7", color: "#92400E" },
+      "Closed Deal": { background: "#F0FDF4", color: "#15803D" },
+    };
+    return (
+      <div>
+        {/* Header */}
+        <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 20 }}>
+          <button onClick={() => setSelectedMall(null)}
+            style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", background: C.white, border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 12, color: C.sub, cursor: "pointer", fontWeight: 500 }}>
+            <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M12 5l-7 7 7 7" /></svg>
+            Back to Malls
+          </button>
+          <div>
+            <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: "-.4px" }}>{selectedMall.name}</div>
+            <div style={{ fontSize: 13, color: C.muted, marginTop: 2 }}>
+              {selectedMall.city} · {mallMerchants.length} merchants · ★ {selectedMall.avgRating}
+            </div>
+          </div>
+        </div>
+
+        {/* Stats row */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 10, marginBottom: 18 }}>
+          <KPI label="Total Merchants" value={mallMerchants.length} sub="In this mall" />
+          <KPI label="Avg Rating" value={`${selectedMall.avgRating} ★`} sub="Mall average" color="#16A34A" />
+          <KPI label="Total Reviews" value={selectedMall.reviewsTotal.toLocaleString()} sub="Across merchants" />
+          <KPI label="High Priority" value={selectedMall.highCount} sub="BD opportunities" color={C.accent} />
+        </div>
+
+        {/* Merchants Table */}
+        <div style={{ background: C.white, borderRadius: 10, border: `1px solid ${C.border}`, overflow: "hidden" }}>
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+              <thead>
+                <tr style={{ background: "#F9F8F7", borderBottom: `1px solid ${C.border}` }}>
+                  {["Merchant", "Category", "Priority", "Rating", "Reviews", "Price", "Hours", "Status"].map(h => (
+                    <th key={h} style={{ padding: "10px 12px", textAlign: "left", fontSize: 10, fontWeight: 600, color: C.muted, textTransform: "uppercase", letterSpacing: .5, whiteSpace: "nowrap" }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {mallMerchants.map((m, i) => {
+                  const status = statuses[m.Merchant + m.Mall] || "Uncontacted";
+                  return (
+                    <tr key={i} style={{ borderBottom: `1px solid ${C.border}`, background: i % 2 === 0 ? C.white : "#FAFAF9" }}>
+                      <td style={{ padding: "10px 12px" }}>
+                        <span onClick={() => onMerchantClick(m)} style={{ color: C.accent, cursor: "pointer", fontWeight: 500 }}>{m.Merchant}</span>
+                      </td>
+                      <td style={{ padding: "10px 12px", color: C.sub }}>{m.Category}</td>
+                      <td style={{ padding: "10px 12px" }}>
+                        <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 7px", borderRadius: 4,
+                          background: m.Priority.toLowerCase().includes("high") ? "#FEE2E2" : m.Priority.toLowerCase().includes("medium") ? "#FEF3C7" : "#F0FDF4",
+                          color: m.Priority.toLowerCase().includes("high") ? "#DC2626" : m.Priority.toLowerCase().includes("medium") ? "#92400E" : "#15803D"
+                        }}>{m.Priority}</span>
+                      </td>
+                      <td style={{ padding: "10px 12px" }}>{m.Rating > 0 ? `★ ${m.Rating}` : "—"}</td>
+                      <td style={{ padding: "10px 12px", color: C.sub }}>{m.Reviews > 0 ? m.Reviews.toLocaleString() : "—"}</td>
+                      <td style={{ padding: "10px 12px", color: C.sub }}>{m.AvgPrice || "—"}</td>
+                      <td style={{ padding: "10px 12px", color: C.sub, maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.HoursCategory}</td>
+                      <td style={{ padding: "10px 12px" }}>
+                        <select value={status} onChange={e => setStatuses(s => ({ ...s, [m.Merchant + m.Mall]: e.target.value }))}
+                          style={{ ...statusStyles[status], fontSize: 11, padding: "3px 7px", borderRadius: 5, border: "none", cursor: "pointer", fontWeight: 500 }}>
+                          {["Uncontacted", "Contacted", "In Progress", "Closed Deal"].map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Malls Grid View ──
+  return (
+    <div>
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: "-.4px" }}>Malls Profile</div>
+        <div style={{ fontSize: 13, color: C.muted, marginTop: 3 }}>
+          {filtered.length} malls · {merchants.filter(m => m.Mall).length.toLocaleString()} merchants across KSA
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div style={{ display: "flex", gap: 12, marginBottom: 20, alignItems: "center", flexWrap: "wrap" }}>
+        {/* Search */}
+        <div style={{ position: "relative" }}>
+          <svg style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={C.muted} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
+          </svg>
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search malls…"
+            style={{ paddingLeft: 32, paddingRight: 12, paddingTop: 8, paddingBottom: 8, border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 13, outline: "none", background: C.white, color: C.text, width: 200 }} />
+        </div>
+
+        {/* City Filter */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <label style={{ fontSize: 10, fontWeight: 600, color: C.muted, textTransform: "uppercase", letterSpacing: .5 }}>City</label>
+          <select value={cityFilter} onChange={e => setCityFilter(e.target.value)}
+            style={{ padding: "8px 12px", border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 13, background: C.white, color: C.text, outline: "none", cursor: "pointer" }}>
+            {allCities.map(c => <option key={c} value={c}>{c === "All" ? "All Cities" : c}</option>)}
+          </select>
+        </div>
+
+        {/* Sort */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <label style={{ fontSize: 10, fontWeight: 600, color: C.muted, textTransform: "uppercase", letterSpacing: .5 }}>Sort By</label>
+          <select value={sortBy} onChange={e => setSortBy(e.target.value)}
+            style={{ padding: "8px 12px", border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 13, background: C.white, color: C.text, outline: "none", cursor: "pointer" }}>
+            <option value="merchants">Most Merchants</option>
+            <option value="rating">Highest Rating</option>
+            <option value="reviews">Most Reviews</option>
+          </select>
+        </div>
+
+        <span style={{ marginLeft: "auto", fontSize: 12, color: C.muted, fontWeight: 500 }}>{filtered.length} malls</span>
+      </div>
+
+      {/* Cards Grid */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 14 }}>
+        {filtered.map((mall, i) => (
+          <div key={i} onClick={() => setSelectedMall(mall)}
+            style={{ background: C.white, borderRadius: 12, border: `1px solid ${C.border}`, padding: 20, cursor: "pointer", transition: "all .18s", boxShadow: "0 1px 3px rgba(0,0,0,.05)" }}
+            onMouseEnter={e => { e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,.1)"; e.currentTarget.style.borderColor = C.accent; }}
+            onMouseLeave={e => { e.currentTarget.style.boxShadow = "0 1px 3px rgba(0,0,0,.05)"; e.currentTarget.style.borderColor = C.border; }}>
+
+            {/* Header */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: C.text, lineHeight: 1.3, marginBottom: 4 }}>{mall.name}</div>
+                <span style={{ fontSize: 10, fontWeight: 600, padding: "3px 8px", borderRadius: 12, background: C.accentL, color: C.accent }}>
+                  {mall.city}
+                </span>
+              </div>
+              <div style={{ width: 40, height: 40, borderRadius: 10, background: C.accentL, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke={C.accent} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z" /><line x1="3" y1="6" x2="21" y2="6" /><path d="M16 10a4 4 0 01-8 0" />
+                </svg>
+              </div>
+            </div>
+
+            {/* Stats Row */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 14 }}>
+              <div style={{ background: "#F9F8F7", borderRadius: 8, padding: "8px 10px", textAlign: "center" }}>
+                <div style={{ fontSize: 16, fontWeight: 700, color: C.text }}>{mall.merchants}</div>
+                <div style={{ fontSize: 10, color: C.muted, marginTop: 2 }}>Merchants</div>
+              </div>
+              <div style={{ background: "#F9F8F7", borderRadius: 8, padding: "8px 10px", textAlign: "center" }}>
+                <div style={{ fontSize: 16, fontWeight: 700, color: mall.avgRating >= 4 ? "#16A34A" : mall.avgRating >= 3 ? "#D97706" : C.accent }}>
+                  {mall.avgRating > 0 ? `★ ${mall.avgRating}` : "—"}
+                </div>
+                <div style={{ fontSize: 10, color: C.muted, marginTop: 2 }}>Avg Rating</div>
+              </div>
+              <div style={{ background: "#F9F8F7", borderRadius: 8, padding: "8px 10px", textAlign: "center" }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>
+                  {mall.reviewsTotal >= 1000 ? `${(mall.reviewsTotal / 1000).toFixed(1)}k` : mall.reviewsTotal}
+                </div>
+                <div style={{ fontSize: 10, color: C.muted, marginTop: 2 }}>Reviews</div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ fontSize: 11, color: C.muted }}>
+                Top: <span style={{ color: C.text, fontWeight: 500 }}>{mall.topCategory}</span>
+              </div>
+              {mall.highCount > 0 && (
+                <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 7px", borderRadius: 10, background: "#FEE2E2", color: "#DC2626" }}>
+                  {mall.highCount} High ↑
+                </span>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /* ─── MAIN APP ───────────────────────────────────────────────── */
 export default function App() {
   const [anonKey, setAnonKey] = useState(null);
@@ -869,7 +1107,8 @@ export default function App() {
   const TABS = [
     { id: "macro", label: "Market Overview", d: "M4 15l4-8 4 4 4-6 4 6" },
     { id: "profiler", label: "Merchant Profiler", d: "M12 12c2.7 0 5-2.3 5-5s-2.3-5-5-5-5 2.3-5 5 2.3 5 5 5zm0 2c-3.3 0-10 1.7-10 5v1h20v-1c0-3.3-6.7-5-10-5z" },
-    { id: "pipeline", label: "BD Pipeline", d: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" },
+    { id: "malls", label: "Malls Profile", d: "M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4zM3 6h18M16 10a4 4 0 01-8 0" },
+    { id: "pipeline", label: "Merchant Acquisition Pipeline", d: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" },
   ];
 
   const canonicalMap = useMemo(() => {
@@ -953,6 +1192,7 @@ export default function App() {
       <main style={{ flex: 1, overflowY: "auto", padding: 24 }}>
         {tab === "macro" && <MacroTab merchants={unifiedMerchants} />}
         {tab === "profiler" && <ProfilerTab merchants={unifiedMerchants} anonKey={anonKey} initialMerchant={selectedMerchantForProfile} />}
+        {tab === "malls" && <MallsTab merchants={unifiedMerchants} onMerchantClick={handleMerchantClick} />}
         {tab === "pipeline" && <PipelineTab merchants={unifiedMerchants} onMerchantClick={handleMerchantClick} />}
       </main>
     </div>

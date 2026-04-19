@@ -1,0 +1,149 @@
+{
+  "total_merchants": 3650,
+  "total_malls": 22,
+  "total_cities": 1,
+  "avg_rating": 4.27,
+  "median_reviews": 379.0,
+  "avg_bd_score": 59.17,
+  "pct_tier1": 6.8,
+  "pct_high_priority": 35.9,
+  "pct_positive_sentiment": 74.4,
+  "pct_with_phone": 41.5,
+  "merchants_multi_branch": 2564,
+  "merchants_delivery_mention": 46,
+  "whitespace_gaps": 5,
+  "tier_dist": {
+    "Tier 2": 2673,
+    "Tier 3": 728,
+    "Tier 1": 249
+  },
+  "category_dist": {
+    "Entertainment": 1631,
+    "Cafes": 509,
+    "Casual Dining": 469,
+    "Desserts & Sweets": 465,
+    "Retail - Perfumes": 440,
+    "Fast Food": 136
+  },
+  "quadrant_dist": {
+    "⭐ Star": 1099,
+    "💎 Hidden Gem": 951,
+    "❌ Weak": 856,
+    "⚠️ Risky": 731,
+    "Unknown": 13
+  },
+  "top10_bd_merchants": [
+    {
+      "merchant": "بوليفارد وورلد",
+      "mall": "الرياض بارك",
+      "rating": 4.7,
+      "reviews": 48331,
+      "bd_priority_score": 84.37,
+      "tier": "Tier 1"
+    },
+    {
+      "merchant": "حديقة الوطن",
+      "mall": "الرياض بارك",
+      "rating": 4.2,
+      "reviews": 13550,
+      "bd_priority_score": 83.05,
+      "tier": "Tier 1"
+    },
+    {
+      "merchant": "فوكس سينما",
+      "mall": "الرياض جاليري",
+      "rating": 4.3,
+      "reviews": 8344,
+      "bd_priority_score": 82.68,
+      "tier": "Tier 1"
+    },
+    {
+      "merchant": "ڤوكس سينما",
+      "mall": "سنتريا مول",
+      "rating": 4.3,
+      "reviews": 5160,
+      "bd_priority_score": 81.82,
+      "tier": "Tier 1"
+    },
+    {
+      "merchant": "بلو باي بولينج (فرع حطين)",
+      "mall": "الرياض جاليري",
+      "rating": 4.8,
+      "reviews": 2337,
+      "bd_priority_score": 81.75,
+      "tier": "Tier 1"
+    },
+    {
+      "merchant": "الرياض بارك",
+      "mall": "الرياض بارك",
+      "rating": 4.5,
+      "reviews": 41683,
+      "bd_priority_score": 81.56,
+      "tier": "Tier 1"
+    },
+    {
+      "merchant": "الرياض بارك",
+      "mall": "الرياض جاليري",
+      "rating": 4.5,
+      "reviews": 41683,
+      "bd_priority_score": 81.56,
+      "tier": "Tier 1"
+    },
+    {
+      "merchant": "الرياض بارك",
+      "mall": "سينومي ذا ڤيو موّل",
+      "rating": 4.5,
+      "reviews": 41683,
+      "bd_priority_score": 81.56,
+      "tier": "Tier 1"
+    },
+    {
+      "merchant": "الرياض بارك",
+      "mall": "سنتريا مول",
+      "rating": 4.5,
+      "reviews": 41683,
+      "bd_priority_score": 81.56,
+      "tier": "Tier 1"
+    },
+    {
+      "merchant": "الرياض بارك",
+      "mall": "واجهة روشن - منطقة التسوق",
+      "rating": 4.5,
+      "reviews": 41683,
+      "bd_priority_score": 81.56,
+      "tier": "Tier 1"
+    }
+  ],
+  "top5_malls_by_bd": [
+    {
+      "mall": "سنتريا مول",
+      "merchant_count": 169,
+      "avg_rating": 4.28,
+      "avg_bd_score": 61.81
+    },
+    {
+      "mall": "صحارى مول",
+      "merchant_count": 137,
+      "avg_rating": 4.33,
+      "avg_bd_score": 61.81
+    },
+    {
+      "mall": "واجهة روشن - منطقة التسوق",
+      "merchant_count": 148,
+      "avg_rating": 4.27,
+      "avg_bd_score": 61.42
+    },
+    {
+      "mall": "الرياض بارك",
+      "merchant_count": 163,
+      "avg_rating": 4.28,
+      "avg_bd_score": 61.21
+    },
+    {
+      "mall": "سينومي ذا ڤيو موّل",
+      "merchant_count": 150,
+      "avg_rating": 4.31,
+      "avg_bd_score": 60.74
+    }
+  ]
+}

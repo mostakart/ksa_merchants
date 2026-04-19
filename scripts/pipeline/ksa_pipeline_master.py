@@ -18,6 +18,13 @@ from pathlib import Path
 from collections import Counter
 from dotenv import load_dotenv
 
+# Fix Windows Unicode encoding for emojis
+if sys.platform == "win32":
+    import io
+    os.system('chcp 65001 > nul') # Force UTF-8 in CMD/PowerShell
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', line_buffering=True)
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', line_buffering=True)
+
 warnings.filterwarnings("ignore")
 load_dotenv()
 
@@ -28,6 +35,7 @@ BASE_URL       = "https://maps.googleapis.com/maps/api/place"
 SAVE_EVERY     = 10
 REQUEST_GAP    = 1.5
 OUTPUT_DIR     = Path("output")
+MAX_COST       = 200.0  # $200 limit as requested
 
 KSA_CITIES = [
     {"name": "Riyadh",  "lat": 24.7136, "lng": 46.6753},
@@ -72,8 +80,9 @@ RETAIL_CATEGORIES = [
     ("بخور",       "Retail - Perfumes"),
 ]
 
-# القائمة الموحدة للبحث
-SEARCH_CATEGORIES = FB_CATEGORIES + ENT_CATEGORIES + RETAIL_CATEGORIES
+# القائمة الموحدة للبحث (Filtered for Entertainment & Retail only as requested)
+SEARCH_CATEGORIES = ENT_CATEGORIES + RETAIL_CATEGORIES
+# FB_CATEGORIES = [...] # Skipped for now
 
 # المولات الناقصة (Google مرجعهاش في الـ 20 الأولى)
 MISSING_MALLS = {
@@ -111,8 +120,10 @@ OUTPUT_DIR.mkdir(exist_ok=True)
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s | %(levelname)s | %(message)s",
-    handlers=[logging.StreamHandler(sys.stdout),
-              logging.FileHandler(OUTPUT_DIR / "pipeline.log")]
+    handlers=[
+        logging.StreamHandler(sys.stdout),
+        logging.FileHandler(OUTPUT_DIR / "pipeline.log", encoding="utf-8")
+    ]
 )
 logger = logging.getLogger(__name__)
 
@@ -123,6 +134,9 @@ def cost_line():
     total = sum(_costs[k]*COST_PER[k] for k in COST_PER)
     parts = [f"{k}:{_costs[k]}(${_costs[k]*COST_PER[k]:.3f})" for k in COST_PER if _costs[k]>0]
     return f"💰 ${total:.3f} [{' | '.join(parts)}]"
+
+def get_total_cost():
+    return sum(_costs[k]*COST_PER[k] for k in COST_PER)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -135,11 +149,15 @@ def load_checkpoint():
         try:
             data = json.loads(CHECKPOINT_FILE.read_text(encoding="utf-8"))
             total = sum(len(v) for v in data.get("enriched",{}).values())
-            logger.info(f"✅ Checkpoint: {total} merchants | cities: {data.get('cities_done',[])}")
+            logger.info(f"Checkpoint Loaded: {total} merchants | cities: {data.get('cities_done',[])}")
             return data
         except Exception as e:
             logger.warning(f"Checkpoint corrupted: {e}")
     return {"cities_done":[], "mall_data":{}, "enriched":{}, "contact_done":[], "costs_snapshot":{}}
+
+def update_costs_from_state(state):
+    if "costs_snapshot" in state:
+        _costs.update(state["costs_snapshot"])
 
 def save_checkpoint(state):
     state["costs_snapshot"] = dict(_costs)
@@ -206,7 +224,7 @@ def discover_malls(city: dict) -> list[dict]:
                 logger.error(f"Mall discovery error: {e}")
                 break
 
-    logger.info(f"   ✅ {len(all_malls)} unique malls found in {city['name']}")
+    logger.info(f"   Done: {len(all_malls)} unique malls found in {city['name']}")
     return all_malls
 
 
@@ -214,7 +232,10 @@ def discover_merchants(mall: dict) -> list[dict]:
     if not GOOGLE_API_KEY: return []
     merchants, seen = [], set()
 
-    for cat_query, cat_label in SEARCH_CATEGORIES:
+    for i, (cat_query, cat_label) in enumerate(SEARCH_CATEGORIES):
+        # Print progress so user knows it's working
+        print(f"      🔍 Searching {cat_label} ({cat_query})...", end="\r")
+        
         params = {
             "query":        f"{cat_query} في {mall['mall_name']} {mall['city']}",
             "key":          GOOGLE_API_KEY,
@@ -246,6 +267,7 @@ def discover_merchants(mall: dict) -> list[dict]:
         except Exception as e:
             logger.error(f"Merchant discovery failed [{cat_query}@{mall['mall_name']}]: {e}")
 
+    print(" " * 80, end="\r") # Clear line
     return merchants
 
 
@@ -640,7 +662,7 @@ def run_analysis(excel_path):
         "category_dist":             df["category"].value_counts().to_dict(),
         "quadrant_dist":             df["quadrant"].value_counts().to_dict(),
         "top10_bd_merchants":        df.nlargest(10,"bd_priority_score")[["merchant","mall","rating","reviews","bd_priority_score","tier"]].to_dict("records"),
-        "top5_malls_by_bd":          mall_agg.nlargest(5,"avg_bd_score")[["mall","merchant_count","avg_rating","avg_bd_score"]].to_dict("records"),
+        "top10_malls_by_bd":         mall_agg.nlargest(10,"avg_bd_score")[["mall","merchant_count","avg_rating","avg_bd_score"]].to_dict("records"),
     }
     with open(analysis_dir/"summary_metrics.json","w",encoding="utf-8") as f:
         json.dump(summary, f, ensure_ascii=False, indent=2)
@@ -652,8 +674,8 @@ def run_analysis(excel_path):
     print(f"\n🏆 TOP 10 BD TARGETS:")
     for m in summary["top10_bd_merchants"]:
         print(f"   {m['merchant'][:35]:<35} | {m['mall'][:18]:<18} | {m['bd_priority_score']}")
-    print(f"\n🏪 TOP 5 MALLS:")
-    for m in summary["top5_malls_by_bd"]:
+    print(f"\n🏪 TOP 10 MALLS (Opportunities):")
+    for m in summary["top10_malls_by_bd"]:
         print(f"   {m['mall'][:30]:<30} | {m['merchant_count']} merchants | avg BD {m['avg_bd_score']}")
     print(f"\n   Files: {analysis_dir}/")
 
@@ -682,6 +704,7 @@ def main():
 
     if fresh: clear_checkpoint()
     state = load_checkpoint()
+    update_costs_from_state(state)
     start_time = time.time()
 
     excel_all = OUTPUT_DIR / "KSA_Merchants_All.xlsx"
@@ -763,6 +786,10 @@ def main():
                 print(f"   ⏩ {len(malls)} malls from checkpoint")
 
             for mall in malls:
+                if get_total_cost() >= MAX_COST:
+                    print(f"\n🛑 COST LIMIT REACHED (${MAX_COST}) — Stopping for now.")
+                    save_checkpoint(state)
+                    return
                 process_mall(mall, city_name, state, start_time)
 
             state.setdefault("cities_done", []).append(city_name)

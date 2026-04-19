@@ -114,7 +114,7 @@
       "tier": "Tier 1"
     }
   ],
-  "top5_malls_by_bd": [
+  "top10_malls_by_bd": [
     {
       "mall": "سنتريا مول",
       "merchant_count": 169,
@@ -144,6 +144,36 @@
       "merchant_count": 150,
       "avg_rating": 4.31,
       "avg_bd_score": 60.74
+    },
+    {
+      "mall": "الرياض جاليري",
+      "merchant_count": 211,
+      "avg_rating": 4.3,
+      "avg_bd_score": 60.67
+    },
+    {
+      "mall": "ذا زون",
+      "merchant_count": 176,
+      "avg_rating": 4.34,
+      "avg_bd_score": 60.55
+    },
+    {
+      "mall": "بانوراما مول",
+      "merchant_count": 133,
+      "avg_rating": 4.33,
+      "avg_bd_score": 60.23
+    },
+    {
+      "mall": "رياض افنيو مول",
+      "merchant_count": 206,
+      "avg_rating": 4.28,
+      "avg_bd_score": 60.13
+    },
+    {
+      "mall": "الفيصلية مول",
+      "merchant_count": 108,
+      "avg_rating": 4.28,
+      "avg_bd_score": 60.01
     }
   ]
 }

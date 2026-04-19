@@ -653,14 +653,13 @@ function ProfilerTab({ merchants, anonKey, initialMerchant }) {
 }
 
 /* ─── PIPELINE TAB ───────────────────────────────────────────── */
-function PipelineTab({ merchants, onMerchantClick }) {
+function PipelineTab({ merchants, onMerchantClick, statuses, onStatusChange }) {
   const [city, setCity] = useState("All");
   const [mall, setMall] = useState("All");
   const [prio, setPrio] = useState("All");
   const [cat, setCat] = useState("All");
   const [price, setPrice] = useState("All");
   const [hours, setHours] = useState("All");
-  const [statuses, setStatuses] = useState({});
   const [page, setPage] = useState(1);
   const pageSize = 100;
 
@@ -782,7 +781,7 @@ function PipelineTab({ merchants, onMerchantClick }) {
             </thead>
             <tbody>
               {rows.map((m, i) => {
-                const key = m.Merchant + m.Mall;
+                const key = `${m.Merchant}|${m.Mall || ""}`;
                 const st = statuses[key] || "Uncontacted";
                 return (
                   <tr key={i} style={{ borderBottom: `1px solid #F4F2EE` }}>
@@ -800,7 +799,7 @@ function PipelineTab({ merchants, onMerchantClick }) {
                     <td style={{ padding: "9px 12px", color: C.muted }}>{m.AvgPrice || "—"}</td>
                     <td style={{ padding: "9px 12px", color: C.muted, fontSize: 11, maxWidth: 150, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={m.OpeningHours}>{m.OpeningHours || "—"}</td>
                     <td style={{ padding: "9px 12px" }}>
-                      <select value={st} onChange={e => setStatuses(prev => ({ ...prev, [key]: e.target.value }))}
+                      <select value={st} onChange={e => onStatusChange(m, e.target.value)}
                         style={{ padding: "3px 7px", borderRadius: 5, fontSize: 10, fontWeight: 500, border: "none", cursor: "pointer", outline: "none", ...statusStyles[st] }}>
                         {Object.keys(statusStyles).map(s => <option key={s}>{s}</option>)}
                       </select>
@@ -835,12 +834,11 @@ function PipelineTab({ merchants, onMerchantClick }) {
 }
 
 /* ─── MALLS PROFILE TAB ──────────────────────────────────────── */
-function MallsTab({ merchants, onMerchantClick }) {
+function MallsTab({ merchants, onMerchantClick, statuses, onStatusChange }) {
   const [cityFilter, setCityFilter] = useState("All");
   const [search, setSearch] = useState("");
-  const [sortBy, setSortBy] = useState("merchants"); // merchants | rating | reviews
+  const [sortBy, setSortBy] = useState("merchants");
   const [selectedMall, setSelectedMall] = useState(null);
-  const [statuses, setStatuses] = useState({});
 
   // Aggregate malls data
   const mallsData = useMemo(() => {
@@ -933,7 +931,7 @@ function MallsTab({ merchants, onMerchantClick }) {
               </thead>
               <tbody>
                 {mallMerchants.map((m, i) => {
-                  const status = statuses[m.Merchant + m.Mall] || "Uncontacted";
+                  const status = statuses[`${m.Merchant}|${m.Mall || ""}`] || "Uncontacted";
                   return (
                     <tr key={i} style={{ borderBottom: `1px solid ${C.border}`, background: i % 2 === 0 ? C.white : "#FAFAF9" }}>
                       <td style={{ padding: "10px 12px" }}>
@@ -951,7 +949,7 @@ function MallsTab({ merchants, onMerchantClick }) {
                       <td style={{ padding: "10px 12px", color: C.sub }}>{m.AvgPrice || "—"}</td>
                       <td style={{ padding: "10px 12px", color: C.sub, maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.HoursCategory}</td>
                       <td style={{ padding: "10px 12px" }}>
-                        <select value={status} onChange={e => setStatuses(s => ({ ...s, [m.Merchant + m.Mall]: e.target.value }))}
+                        <select value={status} onChange={e => onStatusChange(m, e.target.value)}
                           style={{ ...statusStyles[status], fontSize: 11, padding: "3px 7px", borderRadius: 5, border: "none", cursor: "pointer", fontWeight: 500 }}>
                           {["Uncontacted", "Contacted", "In Progress", "Closed Deal"].map(s => <option key={s} value={s}>{s}</option>)}
                         </select>
@@ -1080,6 +1078,8 @@ export default function App() {
   const [loadingCity, setLoadingCity] = useState("");
   const [tab, setTab] = useState("macro");
   const [selectedMerchantForProfile, setSelectedMerchantForProfile] = useState(null);
+  const [statuses, setStatuses] = useState({});  // { "MerchantName|Mall": "status" }
+  const [statusSaving, setStatusSaving] = useState(false); // eslint-disable-line no-unused-vars
 
   const handleMerchantClick = (merchant) => {
     setSelectedMerchantForProfile(merchant);
@@ -1102,6 +1102,51 @@ export default function App() {
     }
     setMerchants(all);
     setLoadingCity("");
+    // Load statuses after merchants are ready
+    if (session) await loadStatuses();
+  }
+
+  async function loadStatuses() {
+    try {
+      const r = await fetch(
+        `${SB_URL}/rest/v1/merchant_status?select=merchant_name,mall,status&limit=10000`,
+        { headers: sbH(anonKey, session.access_token) }
+      );
+      if (!r.ok) return;
+      const rows = await r.json();
+      const map = {};
+      for (const row of rows) {
+        map[`${row.merchant_name}|${row.mall || ""}`] = row.status;
+      }
+      setStatuses(map);
+    } catch (e) { console.warn("Could not load statuses:", e.message); }
+  }
+
+  async function handleStatusChange(merchant, newStatus) {
+    const key = `${merchant.Merchant}|${merchant.Mall || ""}`;
+    // Optimistic update — instant UI
+    setStatuses(prev => ({ ...prev, [key]: newStatus }));
+    // Persist to Supabase
+    try {
+      setStatusSaving(true);
+      await fetch(`${SB_URL}/rest/v1/merchant_status`, {
+        method: "POST",
+        headers: {
+          ...sbH(anonKey, session.access_token),
+          "Prefer": "resolution=merge-duplicates"
+        },
+        body: JSON.stringify({
+          user_id: session.user.id,
+          user_email: session.user.email,
+          merchant_name: merchant.Merchant,
+          mall: merchant.Mall || "",
+          city: merchant.City || "",
+          status: newStatus,
+          updated_at: new Date().toISOString()
+        })
+      });
+    } catch (e) { console.warn("Status save failed:", e.message); }
+    finally { setStatusSaving(false); }
   }
 
   const TABS = [
@@ -1192,8 +1237,8 @@ export default function App() {
       <main style={{ flex: 1, overflowY: "auto", padding: 24 }}>
         {tab === "macro" && <MacroTab merchants={unifiedMerchants} />}
         {tab === "profiler" && <ProfilerTab merchants={unifiedMerchants} anonKey={anonKey} initialMerchant={selectedMerchantForProfile} />}
-        {tab === "malls" && <MallsTab merchants={unifiedMerchants} onMerchantClick={handleMerchantClick} />}
-        {tab === "pipeline" && <PipelineTab merchants={unifiedMerchants} onMerchantClick={handleMerchantClick} />}
+        {tab === "malls" && <MallsTab merchants={unifiedMerchants} onMerchantClick={handleMerchantClick} statuses={statuses} onStatusChange={handleStatusChange} />}
+        {tab === "pipeline" && <PipelineTab merchants={unifiedMerchants} onMerchantClick={handleMerchantClick} statuses={statuses} onStatusChange={handleStatusChange} />}
       </main>
     </div>
   );

@@ -12,7 +12,7 @@ const MODELS = [
 // ─── Prompt Engineering ───────────────────────────────────────────────────────
 
 const buildSystemPrompt = () => `
-You are an elite Business Development AI for a food-tech SaaS company operating in Saudi Arabia (KSA).
+You are an elite Business Development AI for a SaaS company operating in Saudi Arabia (KSA).
 Your task: analyze merchant customer reviews and return a structured JSON merchant profile.
 
 STRICT RULES:
@@ -26,7 +26,7 @@ JSON SCHEMA (return exactly these keys):
   "sentiment_score": <integer 1-10, overall customer sentiment>,
   "top_praise": "<single most praised aspect, in Arabic>",
   "top_complaint": "<single most critical complaint, in Arabic>",
-  "menu_heroes": ["<top dish/item mentioned positively, Arabic>", ...],
+  "service_highlights": ["<top dish/activity/item mentioned positively, Arabic>", ...],
   "bd_priority_score": <integer 1-10, how urgently our BD team should target this merchant>,
   "arabic_sales_pitch": "<full persuasive B2B sales script in Arabic, 3-5 sentences, addressing the merchant's pain points, highlighting our platform's ROI, and ending with a clear call-to-action>"
 }
@@ -158,9 +158,9 @@ function ProfileCard({ result, model, label }) {
             <Field label="Top Complaint ⚠️" value={result.top_complaint} arabic />
 
             <div style={styles.field}>
-                <span style={styles.fieldLabel}>Menu Heroes 🌟</span>
+                <span style={styles.fieldLabel}>Service/Menu Highlights 🌟</span>
                 <div style={styles.pills}>
-                    {result.menu_heroes?.map((item, i) => (
+                    {result.service_highlights?.map((item, i) => (
                         <span key={i} style={styles.pill}>{item}</span>
                     ))}
                 </div>

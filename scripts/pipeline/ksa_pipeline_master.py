@@ -49,6 +49,19 @@ FB_CATEGORIES = [
     ("حلويات",     "Desserts & Sweets"),
 ]
 
+ENT_CATEGORIES = [
+    ("cinema",     "Entertainment"),
+    ("entertainment center", "Entertainment"),
+    ("kids area",  "Entertainment"),
+    ("bowling",    "Entertainment"),
+    ("ألعاب أطفال", "Entertainment"),
+    ("سينما",      "Entertainment"),
+    ("ترفيه",      "Entertainment"),
+]
+
+# القائمة الموحدة للبحث
+SEARCH_CATEGORIES = FB_CATEGORIES + ENT_CATEGORIES
+
 # المولات الناقصة (Google مرجعهاش في الـ 20 الأولى)
 MISSING_MALLS = {
     "Riyadh": [
@@ -78,7 +91,7 @@ COST_PER = {"text_search":0.032, "place_details":0.017, "contact":0.003, "gemini
 
 POSITIVE_KEYWORDS = ["لذيذ","لذيذة","رائع","رائعة","ممتاز","ممتازة","جميل","جميلة","نظيف","نظيفة","سريع","سريعة","مذهل","إبداع","طازج","طازجة","هادئ","مريح","أنصح","ننصح","أفضل","أحسن","جودة","يستاهل","احترافي","متميز","خدمة ممتازة","تجربة رائعة","تنوع","كرم","شهي","مبدع"]
 NEGATIVE_KEYWORDS = ["بطيء","بطيئة","انتظار","غالي","غالية","سيء","سيئة","مزعج","بارد","باردة","ضوضاء","صغير","ضيق","مشكلة","شكوى","خيبة","متأخر","قديم","قذر","مكلف","مخيب","لا أنصح","لا ننصح","مؤسف","أسعار مرتفعة","جودة رديئة","لن أعود","ما أرجع","ضعيف","بدون طعم","رديء","فوضى","تأخر"]
-CATEGORY_PRICE_DEFAULTS = {"Casual Dining":65.0,"Fast Food":35.0,"Cafes":45.0,"Desserts & Sweets":30.0,"Other":50.0}
+CATEGORY_PRICE_DEFAULTS = {"Casual Dining":65.0,"Fast Food":35.0,"Cafes":45.0,"Desserts & Sweets":30.0,"Entertainment":75.0,"Other":50.0}
 
 # ── LOGGING ───────────────────────────────────────────────────────────────────
 OUTPUT_DIR.mkdir(exist_ok=True)
@@ -188,7 +201,7 @@ def discover_merchants(mall: dict) -> list[dict]:
     if not GOOGLE_API_KEY: return []
     merchants, seen = [], set()
 
-    for cat_query, cat_label in FB_CATEGORIES:
+    for cat_query, cat_label in SEARCH_CATEGORIES:
         params = {
             "query":        f"{cat_query} في {mall['mall_name']} {mall['city']}",
             "key":          GOOGLE_API_KEY,
@@ -337,28 +350,46 @@ def calc_priority(merchant, branch_count):
 def process_mall(mall, city_name, state, start_time):
     mall_key = f"{city_name}::{mall['mall_name']}"
 
-    if mall_key in state.get("enriched", {}):
-        n = len(state["enriched"][mall_key])
-        print(f"   ⏩ {mall['mall_name']:<35} {n} merchants (cached)")
-        return
+    # Check if we should skip or do a category top-up
+    existing_merchants = state.get("enriched", {}).get(mall_key, [])
+    if existing_merchants:
+        # If we have merchants but want to ensure all current categories are searched
+        # we only proceed if we suspect new categories might yield more results.
+        # For simplicity, we'll run discovery but skip enrichment for known place_ids.
+        print(f"   🔄 {mall['mall_name']:<35} (Top-up mode: checking for new categories)")
+    else:
+        print(f"\n   🏪 {mall['mall_name']}")
 
-    print(f"\n   🏪 {mall['mall_name']}")
     merchants = discover_merchants(mall)
     if not merchants:
         print(f"      ⚠️  No merchants found")
         return
-    print(f"      Found {len(merchants)} merchants | {cost_line()}")
 
-    # Phase 1: basic
+    # Filter out merchants already fully processed in this mall to save costs
+    processed_pids = {m["place_id"] for m in existing_merchants if m.get("p2_status") == "OK"}
+    new_merchants = [m for m in merchants if m["place_id"] not in processed_pids]
+
+    if not new_merchants:
+        print(f"      ✅ No new merchants found in new categories.")
+        state["enriched"][mall_key] = existing_merchants # Ensure it's kept
+        return
+
+    print(f"      Found {len(new_merchants)} NEW merchants (Total {len(merchants)}) | {cost_line()}")
+    
+    # Continue processing only the NEW ones
+    current_pool = existing_merchants[:]
+    # We will append new ones as they get enriched
+
+    # Phase 1: basic enrichment for NEW merchants
     enriched_p1 = []
-    for i, m in enumerate(merchants):
+    for i, m in enumerate(new_merchants):
         enriched_p1.append(enrich_basic(dict(m)))
         if (i+1) % SAVE_EVERY == 0:
-            state["enriched"][mall_key] = enriched_p1[:]
+            state["enriched"][mall_key] = current_pool + enriched_p1
             save_checkpoint(state)
-            print(f"      [p1 {i+1}/{len(merchants)}] 💾 | {cost_line()} | ⏱ {(time.time()-start_time)/60:.1f}m")
+            print(f"      [p1 {i+1}/{len(new_merchants)}] 💾 | {cost_line()} | ⏱ {(time.time()-start_time)/60:.1f}m")
 
-    # Phase 2: contact
+    # Phase 2: contact enrichment for NEW merchants
     enriched_p2 = []
     contact_done = set(state.get("contact_done", []))
     for i, m in enumerate(enriched_p1):
@@ -368,15 +399,16 @@ def process_mall(mall, city_name, state, start_time):
             contact_done.add(pid)
         enriched_p2.append(m)
         if (i+1) % SAVE_EVERY == 0:
-            state["enriched"][mall_key] = enriched_p2[:]
+            state["enriched"][mall_key] = current_pool + enriched_p2
             state["contact_done"] = list(contact_done)
             save_checkpoint(state)
             print(f"      [p2 {i+1}/{len(enriched_p1)}] 💾 | {cost_line()}")
 
-    state["enriched"][mall_key] = enriched_p2
+    # Merge and final save
+    state["enriched"][mall_key] = current_pool + enriched_p2
     state["contact_done"] = list(contact_done)
     save_checkpoint(state)
-    print(f"      ✅ {len(enriched_p2)} merchants | {cost_line()}")
+    print(f"      ✅ Added {len(enriched_p2)} new merchants | {cost_line()}")
 
 
 # ══════════════════════════════════════════════════════════════════════════════

@@ -132,10 +132,14 @@ function computeCityStats(merchants) {
   return r;
 }
 
+function price_to_range(level) {
+  return {0:"10–20 SAR",1:"20–40 SAR",2:"40–80 SAR",3:"80–150 SAR",4:"150+ SAR"}[level] || "";
+}
+
 function computePriceTiers(merchants) {
-  const tiers = { "20–40 SAR": 0, "40–80 SAR": 0, "80–150 SAR": 0, "150+ SAR": 0 };
+  const tiers = { "10–20 SAR": 0, "20–40 SAR": 0, "40–80 SAR": 0, "80–150 SAR": 0, "150+ SAR": 0 };
   merchants.forEach(m => { if (tiers[m.AvgPrice] !== undefined) tiers[m.AvgPrice]++; });
-  const colors = ["#4ADE80", "#E8563A", "#FBBF24", "#818CF8"];
+  const colors = ["#4ADE80", "#E8563A", "#FBBF24", "#818CF8", "#A78BFA"];
   return Object.entries(tiers).map(([name, value], i) => ({ name, value, color: colors[i] }));
 }
 
@@ -648,6 +652,7 @@ function ProfilerTab({ merchants, anonKey, initialMerchant }) {
 /* ─── PIPELINE TAB ───────────────────────────────────────────── */
 function PipelineTab({ merchants, onMerchantClick }) {
   const [city, setCity] = useState("All");
+  const [mall, setMall] = useState("All");
   const [prio, setPrio] = useState("All");
   const [cat, setCat] = useState("All");
   const [price, setPrice] = useState("All");
@@ -657,12 +662,20 @@ function PipelineTab({ merchants, onMerchantClick }) {
   const pageSize = 100;
 
   const allCities = useMemo(() => ["All", ...new Set(merchants.map(m => m.City).filter(Boolean))].sort(), [merchants]);
+  
+  // Mall list depends on selected city
+  const allMalls = useMemo(() => {
+    const list = city === "All" ? merchants : merchants.filter(m => m.City === city);
+    return ["All", ...new Set(list.map(m => m.Mall).filter(Boolean))].sort();
+  }, [merchants, city]);
+
   const allCategories = useMemo(() => ["All", ...new Set(merchants.map(m => m.Category).filter(c => c && c !== "Uncategorized"))].sort(), [merchants]);
   const allPrices = useMemo(() => ["All", ...new Set(merchants.map(m => m.AvgPrice).filter(Boolean))].sort(), [merchants]);
   const allHours = ["All", "24 Hours", "Specified Hours", "Not Available"];
 
   const filteredMerchants = useMemo(() => merchants.filter(m => {
     if (city !== "All" && m.City !== city) return false;
+    if (mall !== "All" && m.Mall !== mall) return false;
     if (prio !== "All") {
       const p = m.Priority.toLowerCase();
       if (prio === "Uncategorized" && p !== "uncategorized") return false;
@@ -672,7 +685,7 @@ function PipelineTab({ merchants, onMerchantClick }) {
     if (price !== "All" && m.AvgPrice !== price) return false;
     if (hours !== "All" && m.HoursCategory !== hours) return false;
     return true;
-  }), [merchants, city, prio, cat, price, hours]);
+  }), [merchants, city, mall, prio, cat, price, hours]);
 
   const totalPages = Math.ceil(filteredMerchants.length / pageSize);
   useEffect(() => { setPage(1); }, [city, prio, cat, price, hours]);
@@ -718,7 +731,8 @@ function PipelineTab({ merchants, onMerchantClick }) {
 
       <div style={{ display: "flex", gap: 10, marginBottom: 14, alignItems: "center", flexWrap: "wrap" }}>
         {[
-          ["City", allCities, city, setCity],
+          ["City", allCities, city, (v) => { setCity(v); setMall("All"); }],
+          ["Mall", allMalls, mall, setMall],
           ["Priority", ["All", "High", "Medium", "Low", "Uncategorized"], prio, setPrio],
           ["Category", allCategories, cat, setCat],
           ["Price", allPrices, price, setPrice],
@@ -729,7 +743,7 @@ function PipelineTab({ merchants, onMerchantClick }) {
             {opts.map((o, i) => <option key={i} value={o}>{i === 0 ? `${label}: All` : o.length > 25 ? o.substring(0, 25) + "..." : o}</option>)}
           </select>
         ))}
-        <button onClick={() => { setCity("All"); setPrio("All"); setCat("All"); setPrice("All"); setHours("All"); }}
+        <button onClick={() => { setCity("All"); setMall("All"); setPrio("All"); setCat("All"); setPrice("All"); setHours("All"); }}
           style={{ padding: "7px 12px", background: "#F4F2EE", border: "none", borderRadius: 7, fontSize: 11, color: C.text, cursor: "pointer", fontWeight: 500 }}>
           Clear Filters
         </button>

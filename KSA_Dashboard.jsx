@@ -122,6 +122,14 @@ function computeCityStats(merchants) {
   return r;
 }
 
+function price_to_range(level) {
+  return {0:"10–20 SAR",1:"20–40 SAR",2:"40–80 SAR",3:"80–150 SAR",4:"150+ SAR"}[level] || "";
+}
+
+function enrich_basic(merchant) {
+  return merchant;
+}
+
 function computePriceTiers(merchants) {
   const tiers = { "20–40 SAR": 0, "40–80 SAR": 0, "80–150 SAR": 0, "150+ SAR": 0 };
   merchants.forEach(m => { if (tiers[m.AvgPrice] !== undefined) tiers[m.AvgPrice]++; });
@@ -554,7 +562,7 @@ Rating: ${selected.Rating}/5 | Reviews: ${selected.Reviews.toLocaleString()} | P
 Reviews: ${selected.Reviews3}
 
 Return JSON exactly:
-{"sentiment_score":<0-100>,"top_praise":"<8 words Arabic>","top_complaint":"<8 words Arabic or null>","menu_heroes":["<dish>"],"price_sensitivity":"<Value for Money|Overpriced|Cheap>","delivery_mentions":<true|false>,"bd_priority_score":<0-100>,"recommended_pitch_angle":"<The Capacity Filler|The Menu Hero|The Traffic Controller|The Visibility Boost>","pitch_script":"<2 Arabic sentences>"}`
+{"sentiment_score":<0-100>,"top_praise":"<8 words Arabic>","top_complaint":"<8 words Arabic or null>","service_highlights":["<key activity or dish>"],"price_sensitivity":"<Value for Money|Overpriced|Cheap>","delivery_mentions":<true|false>,"bd_priority_score":<0-100>,"recommended_pitch_angle":"<The Capacity Filler|The Menu Hero|The Traffic Controller|The Visibility Boost>","pitch_script":"<2 Arabic sentences>"}`
           }]
         })
       });
@@ -699,11 +707,11 @@ Return JSON exactly:
                     <div style={{ fontSize: 13, direction: "rtl", textAlign: "right", padding: "7px 10px", background: bg, borderRadius: 6 }}>{v}</div>
                   </div>
                 ) : null)}
-                {result.menu_heroes?.length > 0 && (
+                {result.service_highlights?.length > 0 && (
                   <div style={{ marginBottom: 8 }}>
-                    <div style={{ fontSize: 10, color: C.muted, textTransform: "uppercase", letterSpacing: .5, marginBottom: 5 }}>Menu Heroes</div>
+                    <div style={{ fontSize: 10, color: C.muted, textTransform: "uppercase", letterSpacing: .5, marginBottom: 5 }}>Service/Menu Highlights</div>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 5, direction: "rtl" }}>
-                      {result.menu_heroes.map((item, i) => <span key={i} style={{ background: "#EFF6FF", color: "#1D4ED8", borderRadius: 4, padding: "3px 8px", fontSize: 11 }}>{item}</span>)}
+                      {result.service_highlights.map((item, i) => <span key={i} style={{ background: "#EFF6FF", color: "#1D4ED8", borderRadius: 4, padding: "3px 8px", fontSize: 11 }}>{item}</span>)}
                     </div>
                   </div>
                 )}
@@ -743,6 +751,7 @@ Return JSON exactly:
 /* ─── PIPELINE TAB ───────────────────────────────────────────── */
 function PipelineTab({ merchants }) {
   const [city, setCity] = useState("All");
+  const [mall, setMall] = useState("All");
   const [prio, setPrio] = useState("All");
   const [cat, setCat] = useState("All");
   const [price, setPrice] = useState("All");
@@ -750,12 +759,20 @@ function PipelineTab({ merchants }) {
   const [statuses, setStatuses] = useState({});
 
   const allCities = useMemo(() => ["All", ...new Set(merchants.map(m => m.City).filter(Boolean))].sort(), [merchants]);
+  
+  // Mall list depends on selected city
+  const allMalls = useMemo(() => {
+    const list = city === "All" ? merchants : merchants.filter(m => m.City === city);
+    return ["All", ...new Set(list.map(m => m.Mall).filter(Boolean))].sort();
+  }, [merchants, city]);
+
   const allCategories = useMemo(() => ["All", ...new Set(merchants.map(m => m.Category).filter(c => c && c !== "Uncategorized"))].sort(), [merchants]);
   const allPrices = useMemo(() => ["All", ...new Set(merchants.map(m => m.AvgPrice).filter(Boolean))].sort(), [merchants]);
   const allHours = ["All", "24 Hours", "Specified Hours", "Not Available"];
 
   const filteredMerchants = useMemo(() => merchants.filter(m => {
     if (city !== "All" && m.City !== city) return false;
+    if (mall !== "All" && m.Mall !== mall) return false;
     if (prio !== "All") {
       const p = m.Priority.toLowerCase();
       if (prio === "Uncategorized" && p !== "uncategorized") return false;
@@ -765,7 +782,7 @@ function PipelineTab({ merchants }) {
     if (price !== "All" && m.AvgPrice !== price) return false;
     if (hours !== "All" && m.HoursCategory !== hours) return false;
     return true;
-  }), [merchants, city, prio, cat, price, hours]);
+  }), [merchants, city, mall, prio, cat, price, hours]);
 
   const rows = useMemo(() => filteredMerchants.slice(0, 300), [filteredMerchants]);
 
@@ -809,7 +826,8 @@ function PipelineTab({ merchants }) {
 
       <div style={{ display: "flex", gap: 10, marginBottom: 14, alignItems: "center", flexWrap: "wrap" }}>
         {[
-          ["City", allCities, city, setCity],
+          ["City", allCities, city, (v) => { setCity(v); setMall("All"); }],
+          ["Mall", allMalls, mall, setMall],
           ["Priority", ["All", "High", "Medium", "Low", "Uncategorized"], prio, setPrio],
           ["Category", allCategories, cat, setCat],
           ["Price", allPrices, price, setPrice],
@@ -820,7 +838,7 @@ function PipelineTab({ merchants }) {
             {opts.map((o, i) => <option key={i} value={o}>{i === 0 ? `${label}: All` : o.length > 25 ? o.substring(0, 25) + "..." : o}</option>)}
           </select>
         ))}
-        <button onClick={() => { setCity("All"); setPrio("All"); setCat("All"); setPrice("All"); setHours("All"); }}
+        <button onClick={() => { setCity("All"); setMall("All"); setPrio("All"); setCat("All"); setPrice("All"); setHours("All"); }}
           style={{ padding: "7px 12px", background: "#F4F2EE", border: "none", borderRadius: 7, fontSize: 11, color: C.text, cursor: "pointer", fontWeight: 500 }}>
           Clear Filters
         </button>

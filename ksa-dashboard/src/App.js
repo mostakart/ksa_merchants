@@ -105,6 +105,7 @@ const norm = m => {
     Category: m.category || "Uncategorized",
     OpeningHours: hRaw.toLowerCase() === "none" || hRaw.toLowerCase() === "null" || hRaw.toLowerCase() === "nan" ? "" : hRaw,
     HoursCategory: hCat,
+    SubCategory: m.sub_category || "General",
   };
 };
 
@@ -658,6 +659,7 @@ function PipelineTab({ merchants, onMerchantClick, statuses, onStatusChange }) {
   const [mall, setMall] = useState("All");
   const [prio, setPrio] = useState("All");
   const [cat, setCat] = useState("All");
+  const [subCat, setSubCat] = useState("All");
   const [price, setPrice] = useState("All");
   const [hours, setHours] = useState("All");
   const [page, setPage] = useState(1);
@@ -672,6 +674,7 @@ function PipelineTab({ merchants, onMerchantClick, statuses, onStatusChange }) {
   }, [merchants, city]);
 
   const allCategories = useMemo(() => ["All", ...new Set(merchants.map(m => m.Category).filter(c => c && c !== "Uncategorized"))].sort(), [merchants]);
+  const allSubCategories = useMemo(() => ["All", ...new Set(merchants.map(m => m.SubCategory).filter(s => s && s !== "General"))].sort(), [merchants]);
   const allPrices = useMemo(() => ["All", ...new Set(merchants.map(m => m.AvgPrice).filter(Boolean))].sort(), [merchants]);
   const allHours = ["All", "24 Hours", "Specified Hours", "Not Available"];
 
@@ -684,13 +687,14 @@ function PipelineTab({ merchants, onMerchantClick, statuses, onStatusChange }) {
       if (prio !== "Uncategorized" && !p.includes(prio.toLowerCase())) return false;
     }
     if (cat !== "All" && m.Category !== cat) return false;
+    if (subCat !== "All" && m.SubCategory !== subCat) return false;
     if (price !== "All" && m.AvgPrice !== price) return false;
     if (hours !== "All" && m.HoursCategory !== hours) return false;
     return true;
-  }), [merchants, city, mall, prio, cat, price, hours]);
+  }), [merchants, city, mall, prio, cat, subCat, price, hours]);
 
   const totalPages = Math.ceil(filteredMerchants.length / pageSize);
-  useEffect(() => { setPage(1); }, [city, prio, cat, price, hours]);
+  useEffect(() => { setPage(1); }, [city, prio, cat, subCat, price, hours]);
   const rows = useMemo(() => filteredMerchants.slice((page - 1) * pageSize, page * pageSize), [filteredMerchants, page]);
 
   const pCounts = useMemo(() => {
@@ -737,6 +741,7 @@ function PipelineTab({ merchants, onMerchantClick, statuses, onStatusChange }) {
           { label: "Mall", icon: "M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z", opts: allMalls, val: mall, fn: setMall, placeholder: "Select Mall" },
           { label: "Priority", icon: "M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z", opts: ["All", "High", "Medium", "Low", "Uncategorized"], val: prio, fn: setPrio },
           { label: "Category", icon: "M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z", opts: allCategories, val: cat, fn: setCat },
+          { label: "Sub-category", icon: "M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01", opts: allSubCategories, val: subCat, fn: setSubCat },
           { label: "Price", icon: "M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6", opts: allPrices, val: price, fn: setPrice },
           { label: "Hours", icon: "M12 22a10 10 0 100-20 10 10 0 000 20z M12 6v6l4 2", opts: allHours, val: hours, fn: setHours },
         ].map(({ label, icon, opts, val, fn, placeholder }) => (
@@ -761,7 +766,7 @@ function PipelineTab({ merchants, onMerchantClick, statuses, onStatusChange }) {
         ))}
 
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <button onClick={() => { setCity("All"); setMall("All"); setPrio("All"); setCat("All"); setPrice("All"); setHours("All"); }}
+          <button onClick={() => { setCity("All"); setMall("All"); setPrio("All"); setCat("All"); setSubCat("All"); setPrice("All"); setHours("All"); }}
             style={{ padding: "8px 14px", background: "#F4F2EE", border: "none", borderRadius: 8, fontSize: 12, color: C.text, cursor: "pointer", fontWeight: 600, transition: "background .2s", height: 35 }}>
             Clear Filters
           </button>
@@ -1153,7 +1158,7 @@ export default function App() {
     { id: "macro", label: "Market Overview", d: "M4 15l4-8 4 4 4-6 4 6" },
     { id: "profiler", label: "Merchant Profiler", d: "M12 12c2.7 0 5-2.3 5-5s-2.3-5-5-5-5 2.3-5 5 2.3 5 5 5zm0 2c-3.3 0-10 1.7-10 5v1h20v-1c0-3.3-6.7-5-10-5z" },
     { id: "malls", label: "Malls Profile", d: "M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4zM3 6h18M16 10a4 4 0 01-8 0" },
-    { id: "pipeline", label: "Merchant Acquisition Pipeline", d: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" },
+    { id: "pipeline", label: "Merchant Pipeline", d: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" },
   ];
 
   const canonicalMap = useMemo(() => {

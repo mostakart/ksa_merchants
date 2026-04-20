@@ -260,6 +260,7 @@ def discover_merchants(mall: dict) -> list[dict]:
                     "rating":        r.get("rating"),
                     "total_reviews": r.get("user_ratings_total"),
                     "category":      cat_label,
+                    "sub_category":  cat_query,
                     "address":       r.get("formatted_address",""),
                 })
             time.sleep(REQUEST_GAP)
@@ -463,7 +464,7 @@ def export_excel(all_enriched, output_path):
         "Retail - Perfumes":"FFD5A6BD",
         "Other":"FFFFFFFF"
     }
-    COLUMNS = [("Priority",12),("Category",14),("Merchant",28),("Mall",22),("City",10),
+    COLUMNS = [("Priority",12),("Category",14),("Sub-category",15),("Merchant",28),("Mall",22),("City",10),
                ("Rating",8),("Reviews",10),("Avg Price",14),("Branches (KSA)",14),
                ("Phone",18),("Website",30),("Opening Hours",45),("Lat",12),("Lng",12),("Top Reviews",70)]
 
@@ -493,7 +494,7 @@ def export_excel(all_enriched, output_path):
             for rn,m in enumerate(merchants,start=2):
                 name=m.get("merchant",""); bc=branch_map.get(name,1)
                 pri=calc_priority(m,bc); cat=m.get("category","Other")
-                vals=[pri,cat,name,m.get("mall_name",""),m.get("city",""),
+                vals=[pri,cat,m.get("sub_category",""),name,m.get("mall_name",""),m.get("city",""),
                       m.get("rating",""),m.get("total_reviews",""),m.get("avg_price",""),bc,
                       m.get("phone",""),m.get("website",""),m.get("opening_hours",""),
                       m.get("lat",""),m.get("lng",""),m.get("reviews_text","")]

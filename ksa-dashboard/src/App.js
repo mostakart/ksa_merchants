@@ -1738,11 +1738,17 @@ export default function App() {
   }
 
   const TABS = [
-    { id: "macro", label: "Market Overview", d: "M4 15l4-8 4 4 4-6 4 6" },
-    { id: "profiler", label: "Merchant Profiler", d: "M12 12c2.7 0 5-2.3 5-5s-2.3-5-5-5-5 2.3-5 5 2.3 5 5 5zm0 2c-3.3 0-10 1.7-10 5v1h20v-1c0-3.3-6.7-5-10-5z" },
-    { id: "malls", label: "Malls Profile", d: "M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4zM3 6h18M16 10a4 4 0 01-8 0" },
-    { id: "pipeline", label: "Merchant Acquisition Pipeline", d: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" },
+    // ── KSA Merchant Intelligence ──────────────────────────────
+    { id: "macro",    label: "Market Overview",              group: "KSA Intelligence", d: "M4 15l4-8 4 4 4-6 4 6" },
+    { id: "profiler", label: "Merchant Profiler",            group: "KSA Intelligence", d: "M12 12c2.7 0 5-2.3 5-5s-2.3-5-5-5-5 2.3-5 5 2.3 5 5 5zm0 2c-3.3 0-10 1.7-10 5v1h20v-1c0-3.3-6.7-5-10-5z" },
+    { id: "malls",    label: "Malls Profile",                group: "KSA Intelligence", d: "M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4zM3 6h18M16 10a4 4 0 01-8 0" },
+    { id: "pipeline", label: "Acquisition Pipeline",         group: "KSA Intelligence", d: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" },
+    // ── CRM & Support Quality ──────────────────────────────────
+    { id: "support",  label: "Support Overview",             group: "CRM & Support",    d: "M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" },
+    { id: "agents",   label: "Agent Performance",            group: "CRM & Support",    d: "M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" },
+    { id: "tickets",  label: "Ticket Explorer",              group: "CRM & Support",    d: "M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8zM14 2v6h6M16 13H8M16 17H8M10 9H8" },
   ];
+
 
   const canonicalMap = useMemo(() => {
     const counts = {};

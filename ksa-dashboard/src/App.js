@@ -33,13 +33,13 @@ const sbH = (key, token) => ({
   "Content-Type": "application/json",
 });
 
-async function sbFetch(table, key, token) {
+async function sbFetch(table, key, token, select = "*") {
   let allRows = [];
   let offset = 0;
   const limit = 1000;
   while (true) {
     const r = await fetch(
-      `${SB_URL}/rest/v1/${table}?select=*&limit=${limit}&offset=${offset}`,
+      `${SB_URL}/rest/v1/${table}?select=${select}&limit=${limit}&offset=${offset}`,
       { headers: sbH(key, token) }
     );
     if (!r.ok) {
@@ -135,7 +135,7 @@ function computeCityStats(merchants) {
 
 // eslint-disable-next-line no-unused-vars
 function price_to_range(level) {
-  return {0:"10–20 SAR",1:"20–40 SAR",2:"40–80 SAR",3:"80–150 SAR",4:"150+ SAR"}[level] || "";
+  return { 0: "10–20 SAR", 1: "20–40 SAR", 2: "40–80 SAR", 3: "80–150 SAR", 4: "150+ SAR" }[level] || "";
 }
 
 function computePriceTiers(merchants) {
@@ -294,6 +294,561 @@ function LoadingScreen({ city }) {
         Loading <strong style={{ color: C.text }}>{city}</strong> merchants…
       </div>
       <style>{`@keyframes bounce { to { transform:translateY(-8px);opacity:.3; } }`}</style>
+    </div>
+  );
+}
+
+/* ─── TICKET HELPERS ─────────────────────────────────────────── */
+function normTicket(t) {
+  const cleanHtml = s => (s || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  return {
+    id: t.id,
+    subject: cleanHtml(t.subject) || "—",
+    status: t.status || "",
+    channel: t.channel || "Other",
+    priority: t.priority || "",
+    reason: t.reason || "Unknown",
+    subReason: t.sub_reason || "",
+    owner: t.ticket_owner || "",
+    createdTime: t.created_time || "",
+    closedTime: t.closed_time || "",
+    happiness: t.happiness_rating || "",
+    resolutionMs: parseInt(t.resolution_time_ms) || 0,
+    numReassign: parseInt(t.num_reassign) || 0,
+    numReopen: parseInt(t.num_reopen) || 0,
+    isOverdue: String(t.is_overdue) === "true",
+    isEscalated: String(t.is_escalated) === "true",
+    slaViolation: t.sla_violation_type || "",
+    escalationValidity: t.escalation_validity || "",
+    merchantName: t.merchant_name || "",
+    country: t.country || "",
+    language: t.language || "",
+    tags: t.tags || "",
+    userId: t.user_id || "",
+    orderId: t.order_id || "",
+  };
+}
+
+function buildAgentMap(tickets) {
+  const counts = {};
+  tickets.forEach(t => { if (t.owner) counts[t.owner] = (counts[t.owner] || 0) + 1; });
+  const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  const map = {};
+  sorted.forEach(([id], i) => { map[id] = `Agent ${String(i + 1).padStart(2, "0")}`; });
+  return map;
+}
+
+function ticketMonthlyData(tickets) {
+  const monthly = {};
+  tickets.forEach(t => {
+    const m = (t.createdTime || "").slice(0, 7);
+    if (!m || m.length < 7) return;
+    if (!monthly[m]) monthly[m] = { month: m, total: 0, chat: 0, phone: 0, email: 0, other: 0 };
+    monthly[m].total++;
+    const ch = (t.channel || "").toLowerCase();
+    if (ch === "chat") monthly[m].chat++;
+    else if (ch === "phone") monthly[m].phone++;
+    else if (ch === "email" || ch === "outbound email") monthly[m].email++;
+    else monthly[m].other++;
+  });
+  return Object.values(monthly).sort((a, b) => a.month.localeCompare(b.month)).slice(-18);
+}
+
+const CH_COLORS = { Chat: "#FF5A00", Phone: "#3B82F6", Email: "#10B981", Facebook: "#8B5CF6", cs: "#94A3B8", Instagram: "#E1306C" };
+const HP_COLORS = { Good: "#10B981", Okay: "#FBBF24", Bad: "#EF4444" };
+
+/* ─── SUPPORT OVERVIEW TAB ───────────────────────────────────── */
+function SupportTab({ tickets }) {
+  const total = tickets.length;
+  const open = tickets.filter(t => t.status === "Open").length;
+  const rated = tickets.filter(t => t.happiness);
+  const good = rated.filter(t => t.happiness === "Good").length;
+  const csat = rated.length ? Math.round(good / rated.length * 100) : 0;
+  const slaOk = tickets.filter(t => t.slaViolation === "Not Violated").length;
+  const slaViol = tickets.filter(t => t.slaViolation && t.slaViolation !== "Not Violated").length;
+  const slaRate = (slaOk + slaViol) > 0 ? Math.round(slaOk / (slaOk + slaViol) * 100) : 100;
+  const resTimes = tickets.filter(t => t.resolutionMs > 0).map(t => t.resolutionMs / 3600000);
+  const avgRes = resTimes.length ? (resTimes.reduce((a, b) => a + b, 0) / resTimes.length).toFixed(1) : "—";
+  const escalated = tickets.filter(t => t.isEscalated).length;
+
+  const monthlyData = useMemo(() => ticketMonthlyData(tickets), [tickets]);
+
+  const channelData = useMemo(() => {
+    const counts = {};
+    tickets.forEach(t => { const ch = t.channel || "Other"; counts[ch] = (counts[ch] || 0) + 1; });
+    return Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 7)
+      .map(([name, value]) => ({ name, value, color: CH_COLORS[name] || "#94A3B8" }));
+  }, [tickets]);
+
+  const reasonData = useMemo(() => {
+    const counts = {};
+    tickets.forEach(t => { if (t.reason) counts[t.reason] = (counts[t.reason] || 0) + 1; });
+    return Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 10)
+      .map(([name, value]) => ({ name: name.length > 22 ? name.slice(0, 22) + "…" : name, value }));
+  }, [tickets]);
+
+  const happinessData = [
+    { name: "Good", value: rated.filter(t => t.happiness === "Good").length, color: HP_COLORS.Good },
+    { name: "Okay", value: rated.filter(t => t.happiness === "Okay").length, color: HP_COLORS.Okay },
+    { name: "Bad", value: rated.filter(t => t.happiness === "Bad").length, color: HP_COLORS.Bad },
+  ].filter(d => d.value > 0);
+
+  const countryData = useMemo(() => {
+    const counts = {};
+    tickets.forEach(t => {
+      if (!t.country) return;
+      const norm = t.country.trim().toUpperCase() === "EGYPT" || t.country.trim() === "Egypt" ? "Egypt" : t.country.trim();
+      counts[norm] = (counts[norm] || 0) + 1;
+    });
+    return Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 6)
+      .map(([name, value]) => ({ name, value }));
+  }, [tickets]);
+
+  return (
+    <div>
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: "-.5px" }}>Support Overview</div>
+        <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>Zoho Desk · {total.toLocaleString()} tickets</div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(6,1fr)", gap: 12, marginBottom: 20 }}>
+        <KPI label="Total Tickets" value={total.toLocaleString()} sub="All time" />
+        <KPI label="Open" value={open} sub="Needs action" color={open > 0 ? C.accent : C.text} />
+        <KPI label="CSAT Score" value={`${csat}%`} sub={`${rated.length.toLocaleString()} rated`} color={csat >= 70 ? "#10B981" : "#EF4444"} />
+        <KPI label="SLA Compliance" value={`${slaRate}%`} sub="Not violated" color={slaRate >= 90 ? "#10B981" : "#FBBF24"} />
+        <KPI label="Avg Resolution" value={`${avgRes}h`} sub="Business hrs" />
+        <KPI label="Escalated" value={escalated.toLocaleString()} sub={`${total ? Math.round(escalated / total * 100) : 0}% rate`} color={escalated > 100 ? "#EF4444" : C.text} />
+      </div>
+
+      {/* Monthly Volume */}
+      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 16, marginBottom: 16 }}>
+        <Card>
+          <ChartTitle>Monthly Ticket Volume — Stacked by Channel</ChartTitle>
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={monthlyData} barCategoryGap="18%">
+              <CartesianGrid strokeDasharray="3 3" stroke={C.border} vertical={false} />
+              <XAxis dataKey="month" tick={{ fontSize: 10 }} tickFormatter={v => v.slice(5)} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
+              <Tooltip content={<CustomTip />} />
+              <Bar dataKey="chat" name="Chat" stackId="a" fill="#FF5A00" />
+              <Bar dataKey="phone" name="Phone" stackId="a" fill="#3B82F6" />
+              <Bar dataKey="email" name="Email" stackId="a" fill="#10B981" />
+              <Bar dataKey="other" name="Other" stackId="a" fill="#94A3B8" radius={[3, 3, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+          <div style={{ display: "flex", gap: 14, marginTop: 8 }}>
+            {[["Chat", "#FF5A00"], ["Phone", "#3B82F6"], ["Email", "#10B981"], ["Other", "#94A3B8"]].map(([l, c]) => (
+              <span key={l} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: C.sub }}>
+                <span style={{ width: 8, height: 8, borderRadius: 2, background: c }} />{l}
+              </span>
+            ))}
+          </div>
+        </Card>
+
+        <Card>
+          <ChartTitle>Channel Breakdown</ChartTitle>
+          <ResponsiveContainer width="100%" height={160}>
+            <PieChart>
+              <Pie data={channelData} cx="50%" cy="50%" outerRadius={62} dataKey="value" nameKey="name">
+                {channelData.map((d, i) => <Cell key={i} fill={d.color} />)}
+              </Pie>
+              <Tooltip formatter={v => v.toLocaleString()} />
+            </PieChart>
+          </ResponsiveContainer>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 6 }}>
+            {channelData.map(d => (
+              <div key={d.name} style={{ display: "flex", justifyContent: "space-between", fontSize: 11 }}>
+                <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: "50%", background: d.color, flexShrink: 0 }} />
+                  {d.name}
+                </span>
+                <span style={{ fontWeight: 500 }}>{d.value.toLocaleString()}</span>
+              </div>
+            ))}
+          </div>
+        </Card>
+      </div>
+
+      {/* Reason + CSAT + Country */}
+      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gap: 16 }}>
+        <Card>
+          <ChartTitle>Top 10 Ticket Reasons</ChartTitle>
+          <ResponsiveContainer width="100%" height={260}>
+            <BarChart data={reasonData} layout="vertical" barCategoryGap="20%">
+              <CartesianGrid strokeDasharray="3 3" stroke={C.border} vertical={false} />
+              <XAxis type="number" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
+              <YAxis dataKey="name" type="category" tick={{ fontSize: 10 }} width={150} axisLine={false} tickLine={false} />
+              <Tooltip content={<CustomTip />} />
+              <Bar dataKey="value" name="Tickets" fill={C.accent} radius={[0, 3, 3, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </Card>
+
+        <Card>
+          <ChartTitle>CSAT — Happiness Rating</ChartTitle>
+          <ResponsiveContainer width="100%" height={140}>
+            <PieChart>
+              <Pie data={happinessData} cx="50%" cy="50%" innerRadius={38} outerRadius={58} dataKey="value">
+                {happinessData.map((d, i) => <Cell key={i} fill={d.color} />)}
+              </Pie>
+              <Tooltip formatter={v => v.toLocaleString()} />
+            </PieChart>
+          </ResponsiveContainer>
+          <div style={{ textAlign: "center", marginTop: 6 }}>
+            <div style={{ fontSize: 26, fontWeight: 700, color: csat >= 70 ? "#10B981" : "#EF4444" }}>{csat}%</div>
+            <div style={{ fontSize: 10, color: C.muted }}>Good responses</div>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-around", marginTop: 10 }}>
+            {happinessData.map(d => (
+              <div key={d.name} style={{ textAlign: "center" }}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: d.color }}>{d.value.toLocaleString()}</div>
+                <div style={{ fontSize: 10, color: C.muted }}>{d.name}</div>
+              </div>
+            ))}
+          </div>
+        </Card>
+
+        <Card>
+          <ChartTitle>Top Countries</ChartTitle>
+          {countryData.map((d, i) => (
+            <div key={i} style={{ marginBottom: 10 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 3 }}>
+                <span style={{ color: C.sub }}>{d.name}</span>
+                <span style={{ fontWeight: 500 }}>{d.value.toLocaleString()}</span>
+              </div>
+              <div style={{ background: C.border, borderRadius: 3, height: 5, overflow: "hidden" }}>
+                <div style={{ background: C.accent, height: "100%", width: `${Math.round(d.value / total * 100)}%`, borderRadius: 3 }} />
+              </div>
+            </div>
+          ))}
+          <div style={{ marginTop: 12, padding: "8px 10px", background: "#F9F8F7", borderRadius: 7 }}>
+            <div style={{ fontSize: 10, color: C.muted }}>SLA Violations</div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: slaViol > 500 ? "#EF4444" : "#10B981" }}>{slaViol.toLocaleString()}</div>
+          </div>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+/* ─── AGENT PERFORMANCE TAB ──────────────────────────────────── */
+function AgentsTab({ tickets }) {
+  const [sortBy, setSortBy] = useState("tickets");
+  const [selectedAgentId, setSelectedAgentId] = useState(null);
+
+  const agentMap = useMemo(() => buildAgentMap(tickets), [tickets]);
+
+  const agentStats = useMemo(() => {
+    const stats = {};
+    tickets.forEach(t => {
+      if (!t.owner) return;
+      if (!stats[t.owner]) stats[t.owner] = {
+        id: t.owner, name: agentMap[t.owner] || t.owner,
+        tickets: 0, good: 0, bad: 0, okay: 0, rated: 0,
+        slaOk: 0, slaTotal: 0, escalated: 0,
+        resTotal: 0, resCount: 0, reassigns: 0, reasons: {},
+        channels: {},
+      };
+      const s = stats[t.owner];
+      s.tickets++;
+      if (t.happiness === "Good") { s.good++; s.rated++; }
+      if (t.happiness === "Bad") { s.bad++; s.rated++; }
+      if (t.happiness === "Okay") { s.okay++; s.rated++; }
+      if (t.slaViolation) { s.slaTotal++; if (t.slaViolation === "Not Violated") s.slaOk++; }
+      if (t.isEscalated) s.escalated++;
+      if (t.resolutionMs > 0) { s.resTotal += t.resolutionMs; s.resCount++; }
+      s.reassigns += t.numReassign;
+      if (t.reason) s.reasons[t.reason] = (s.reasons[t.reason] || 0) + 1;
+      if (t.channel) s.channels[t.channel] = (s.channels[t.channel] || 0) + 1;
+    });
+    return Object.values(stats).map(s => ({
+      ...s,
+      csat: s.rated ? Math.round(s.good / s.rated * 100) : null,
+      slaRate: s.slaTotal ? Math.round(s.slaOk / s.slaTotal * 100) : null,
+      avgRes: s.resCount ? (s.resTotal / s.resCount / 3600000).toFixed(1) : null,
+      topReason: Object.entries(s.reasons).sort((a, b) => b[1] - a[1])[0]?.[0] || "—",
+      topChannel: Object.entries(s.channels).sort((a, b) => b[1] - a[1])[0]?.[0] || "—",
+    }));
+  }, [tickets, agentMap]);
+
+  const sorted = useMemo(() => [...agentStats].sort((a, b) => {
+    if (sortBy === "tickets") return b.tickets - a.tickets;
+    if (sortBy === "csat") return (b.csat ?? -1) - (a.csat ?? -1);
+    if (sortBy === "sla") return (b.slaRate ?? -1) - (a.slaRate ?? -1);
+    if (sortBy === "resolution") return parseFloat(a.avgRes ?? 9999) - parseFloat(b.avgRes ?? 9999);
+    return 0;
+  }), [agentStats, sortBy]);
+
+  const sel = selectedAgentId ? agentStats.find(a => a.id === selectedAgentId) : null;
+
+  return (
+    <div>
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: "-.5px" }}>Agent Performance</div>
+        <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>{agentStats.length} agents · {tickets.length.toLocaleString()} tickets</div>
+      </div>
+
+      {/* Team KPIs */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 12, marginBottom: 20 }}>
+        {(() => {
+          const totalRated = agentStats.reduce((s, a) => s + a.rated, 0);
+          const totalGood = agentStats.reduce((s, a) => s + a.good, 0);
+          const teamCsat = totalRated ? Math.round(totalGood / totalRated * 100) : 0;
+          const totalEsc = agentStats.reduce((s, a) => s + a.escalated, 0);
+          const bestAgent = [...agentStats].filter(a => a.csat !== null).sort((a, b) => b.csat - a.csat)[0];
+          const topAgent = sorted[0];
+          return (
+            <>
+              <KPI label="Total Agents" value={agentStats.length} sub="Active handlers" />
+              <KPI label="Team CSAT" value={`${teamCsat}%`} sub={`${totalRated.toLocaleString()} rated`} color={teamCsat >= 70 ? "#10B981" : "#EF4444"} />
+              <KPI label="Top Volume" value={topAgent?.name || "—"} sub={`${topAgent?.tickets.toLocaleString()} tickets`} color={C.accent} />
+              <KPI label="Best CSAT" value={bestAgent?.name || "—"} sub={`${bestAgent?.csat ?? 0}% score`} color="#10B981" />
+              <KPI label="Team Escalations" value={totalEsc.toLocaleString()} sub="Total flagged" color={totalEsc > 200 ? "#EF4444" : C.text} />
+            </>
+          );
+        })()}
+      </div>
+
+      <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+        {[["tickets", "By Tickets"], ["csat", "By CSAT"], ["sla", "By SLA %"], ["resolution", "By Fastest Res."]].map(([val, label]) => (
+          <button key={val} onClick={() => setSortBy(val)}
+            style={{ padding: "6px 14px", borderRadius: 6, border: `1px solid ${sortBy === val ? C.accent : C.border}`, background: sortBy === val ? C.accentL : C.white, color: sortBy === val ? C.accent : C.sub, fontSize: 11, cursor: "pointer", fontWeight: sortBy === val ? 600 : 400 }}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: sel ? "1fr 300px" : "1fr", gap: 16 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(195px,1fr))", gap: 10, alignContent: "start" }}>
+          {sorted.map(agent => (
+            <div key={agent.id} onClick={() => setSelectedAgentId(selectedAgentId === agent.id ? null : agent.id)}
+              style={{ background: C.white, border: `1px solid ${selectedAgentId === agent.id ? C.accent : C.border}`, borderRadius: 10, padding: 14, cursor: "pointer", transition: "all .12s" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600 }}>{agent.name}</div>
+                  <div style={{ fontSize: 10, color: C.muted }}>{agent.tickets.toLocaleString()} tickets</div>
+                </div>
+                {agent.csat !== null && (
+                  <span style={{
+                    fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 6,
+                    background: agent.csat >= 70 ? "#DCFCE7" : agent.csat >= 50 ? "#FEF3C7" : "#FEE2E2",
+                    color: agent.csat >= 70 ? "#16A34A" : agent.csat >= 50 ? "#D97706" : "#DC2626"
+                  }}>
+                    {agent.csat}%
+                  </span>
+                )}
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 5 }}>
+                {[["SLA", agent.slaRate !== null ? `${agent.slaRate}%` : "—"], ["Avg Res.", agent.avgRes ? `${agent.avgRes}h` : "—"], ["Escalated", agent.escalated], ["Reassigned", agent.reassigns]].map(([l, v]) => (
+                  <div key={l} style={{ background: "#F9F8F7", borderRadius: 6, padding: "5px 7px" }}>
+                    <div style={{ fontSize: 9, color: C.muted, textTransform: "uppercase" }}>{l}</div>
+                    <div style={{ fontSize: 12, fontWeight: 600 }}>{v}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ marginTop: 8, fontSize: 10, color: C.muted }}>
+                Top reason: <span style={{ color: C.text }}>{agent.topReason.length > 20 ? agent.topReason.slice(0, 20) + "…" : agent.topReason}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {sel && (
+          <Card style={{ alignSelf: "start", fontSize: 12 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 14 }}>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 700 }}>{sel.name}</div>
+                <div style={{ fontSize: 10, color: C.muted }}>{sel.tickets.toLocaleString()} tickets · main: {sel.topChannel}</div>
+              </div>
+              <button onClick={() => setSelectedAgentId(null)} style={{ background: "none", border: "none", color: C.muted, cursor: "pointer", fontSize: 20, lineHeight: 1 }}>×</button>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 14 }}>
+              {[
+                ["CSAT", sel.csat !== null ? `${sel.csat}%` : "N/A", sel.csat !== null && sel.csat >= 70 ? "#10B981" : "#EF4444"],
+                ["SLA Rate", sel.slaRate !== null ? `${sel.slaRate}%` : "N/A", sel.slaRate !== null && sel.slaRate >= 90 ? "#10B981" : "#FBBF24"],
+                ["Avg Res.", sel.avgRes ? `${sel.avgRes}h` : "N/A", null],
+                ["Escalated", sel.escalated, sel.escalated > 10 ? "#EF4444" : null],
+                ["Reassignments", sel.reassigns, null],
+                ["Rated Tickets", sel.rated, null],
+              ].map(([label, val, color]) => (
+                <div key={label} style={{ background: "#F9F8F7", borderRadius: 7, padding: "8px 10px" }}>
+                  <div style={{ fontSize: 9, color: C.muted, textTransform: "uppercase", marginBottom: 2 }}>{label}</div>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: color || C.text }}>{val}</div>
+                </div>
+              ))}
+            </div>
+            <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
+              {[["Good", sel.good, "#10B981"], ["Okay", sel.okay, "#FBBF24"], ["Bad", sel.bad, "#EF4444"]].map(([label, val, color]) => (
+                <div key={label} style={{ flex: 1, textAlign: "center", padding: "8px 4px", background: "#F9F8F7", borderRadius: 7 }}>
+                  <div style={{ fontSize: 18, fontWeight: 700, color }}>{val}</div>
+                  <div style={{ fontSize: 10, color: C.muted }}>{label}</div>
+                </div>
+              ))}
+            </div>
+            <div style={{ fontSize: 11, fontWeight: 600, color: C.muted, textTransform: "uppercase", letterSpacing: .5, marginBottom: 6 }}>Top Reasons</div>
+            {Object.entries(sel.reasons).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([reason, count]) => (
+              <div key={reason} style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", borderBottom: `1px solid ${C.border}`, fontSize: 12 }}>
+                <span style={{ color: C.sub, maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{reason}</span>
+                <span style={{ fontWeight: 500 }}>{count}</span>
+              </div>
+            ))}
+          </Card>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ─── TICKET EXPLORER TAB ────────────────────────────────────── */
+function TicketExplorerTab({ tickets }) {
+  const [channel, setChannel] = useState("All");
+  const [reason, setReason] = useState("All");
+  const [status, setStatus] = useState("All");
+  const [happiness, setHappiness] = useState("All");
+  const [slaF, setSlaF] = useState("All");
+  const [q, setQ] = useState("");
+  const [page, setPage] = useState(1);
+  const [selected, setSelected] = useState(null);
+  const PAGE = 50;
+
+  const channels = useMemo(() => ["All", ...new Set(tickets.map(t => t.channel).filter(Boolean)).values()].sort(), [tickets]);
+  const reasons = useMemo(() => ["All", ...new Set(tickets.map(t => t.reason).filter(Boolean)).values()].sort(), [tickets]);
+  const slaOpts = ["All", "Not Violated", "Resolution Violation"];
+
+  const filtered = useMemo(() => {
+    const qL = q.toLowerCase();
+    return tickets.filter(t => {
+      if (channel !== "All" && t.channel !== channel) return false;
+      if (reason !== "All" && t.reason !== reason) return false;
+      if (status !== "All" && t.status !== status) return false;
+      if (happiness !== "All" && t.happiness !== happiness) return false;
+      if (slaF !== "All" && t.slaViolation !== slaF) return false;
+      if (q && !t.subject.toLowerCase().includes(qL) && !t.merchantName.toLowerCase().includes(qL) && !t.subReason.toLowerCase().includes(qL) && !t.reason.toLowerCase().includes(qL)) return false;
+      return true;
+    }).sort((a, b) => b.createdTime.localeCompare(a.createdTime));
+  }, [tickets, channel, reason, status, happiness, slaF, q]);
+
+  const totalPages = Math.ceil(filtered.length / PAGE);
+  const pageRows = filtered.slice((page - 1) * PAGE, page * PAGE);
+  useEffect(() => setPage(1), [channel, reason, status, happiness, slaF, q]);
+
+  return (
+    <div>
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: "-.5px" }}>Ticket Explorer</div>
+        <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>Browse {tickets.length.toLocaleString()} support tickets</div>
+      </div>
+
+      <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap", alignItems: "center" }}>
+        <div style={{ position: "relative" }}>
+          <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search subject, reason, merchant…"
+            style={{ padding: "8px 12px 8px 34px", border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 12, width: 270, outline: "none", background: C.white }} />
+          <svg style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)" }} width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={C.muted} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
+          </svg>
+        </div>
+        {[["Channel", channels, channel, setChannel], ["Reason", reasons.slice(0, 30), reason, setReason],
+        ["Status", ["All", "Open", "Closed", "Resolved"], status, setStatus],
+        ["CSAT", ["All", "Good", "Okay", "Bad"], happiness, setHappiness],
+        ["SLA", slaOpts, slaF, setSlaF],
+        ].map(([label, opts, val, fn]) => (
+          <select key={label} value={val} onChange={e => fn(e.target.value)}
+            style={{ padding: "8px 10px", border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 12, background: C.white, color: C.text, cursor: "pointer" }}>
+            <option value="All">{label}: All</option>
+            {opts.filter(o => o !== "All").map(o => <option key={o}>{o}</option>)}
+          </select>
+        ))}
+        <button onClick={() => { setChannel("All"); setReason("All"); setStatus("All"); setHappiness("All"); setSlaF("All"); setQ(""); }}
+          style={{ padding: "8px 12px", background: "#F4F2EE", border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 11, color: C.muted, cursor: "pointer" }}>
+          Reset
+        </button>
+        <span style={{ fontSize: 11, color: C.muted, marginLeft: 4 }}>{filtered.length.toLocaleString()} tickets</span>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: selected ? "1fr 360px" : "1fr", gap: 16 }}>
+        <div>
+          <div style={{ background: C.white, borderRadius: 10, border: `1px solid ${C.border}`, overflow: "hidden" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+              <thead>
+                <tr style={{ background: "#F9F8F7", borderBottom: `1px solid ${C.border}` }}>
+                  {["Date", "Subject", "Channel", "Reason", "Sub-Reason", "CSAT", "SLA"].map(h => (
+                    <th key={h} style={{ padding: "10px 12px", textAlign: "left", fontSize: 10, color: C.muted, textTransform: "uppercase", letterSpacing: .5, fontWeight: 500, whiteSpace: "nowrap" }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {pageRows.map(t => (
+                  <tr key={t.id} onClick={() => setSelected(selected?.id === t.id ? null : t)}
+                    style={{ borderBottom: `1px solid #F4F2EE`, cursor: "pointer", background: selected?.id === t.id ? C.accentL : "transparent" }}>
+                    <td style={{ padding: "9px 12px", color: C.muted, whiteSpace: "nowrap", fontSize: 11 }}>{(t.createdTime || "").slice(0, 10)}</td>
+                    <td style={{ padding: "9px 12px", maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={t.subject}>{t.subject}</td>
+                    <td style={{ padding: "9px 12px" }}>
+                      <span style={{ fontSize: 10, padding: "2px 7px", borderRadius: 8, background: `${CH_COLORS[t.channel] || "#94A3B8"}22`, color: CH_COLORS[t.channel] || "#94A3B8", fontWeight: 500 }}>{t.channel}</span>
+                    </td>
+                    <td style={{ padding: "9px 12px", color: C.sub, fontSize: 11, maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.reason}</td>
+                    <td style={{ padding: "9px 12px", color: C.muted, fontSize: 11, maxWidth: 130, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.subReason || "—"}</td>
+                    <td style={{ padding: "9px 12px" }}>
+                      {t.happiness
+                        ? <span style={{ fontSize: 10, fontWeight: 600, color: HP_COLORS[t.happiness] || C.muted }}>{t.happiness}</span>
+                        : <span style={{ color: C.muted }}>—</span>}
+                    </td>
+                    <td style={{ padding: "9px 12px", fontSize: 11, color: t.slaViolation === "Not Violated" ? "#10B981" : t.slaViolation ? "#EF4444" : C.muted }}>
+                      {t.slaViolation === "Not Violated" ? "✓ OK" : t.slaViolation ? "✗ Violated" : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 12, fontSize: 11, color: C.muted }}>
+            <span>Showing {filtered.length === 0 ? 0 : (page - 1) * PAGE + 1}–{Math.min(page * PAGE, filtered.length)} of {filtered.length.toLocaleString()}</span>
+            <div style={{ display: "flex", gap: 6 }}>
+              <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+                style={{ padding: "5px 10px", border: `1px solid ${C.border}`, borderRadius: 6, fontSize: 11, background: page === 1 ? "#F4F2EE" : C.white, cursor: page === 1 ? "not-allowed" : "pointer", color: page === 1 ? C.muted : C.text }}>←</button>
+              <span style={{ padding: "5px 10px" }}>Page {page} / {totalPages || 1}</span>
+              <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages}
+                style={{ padding: "5px 10px", border: `1px solid ${C.border}`, borderRadius: 6, fontSize: 11, background: page >= totalPages ? "#F4F2EE" : C.white, cursor: page >= totalPages ? "not-allowed" : "pointer", color: page >= totalPages ? C.muted : C.text }}>→</button>
+            </div>
+          </div>
+        </div>
+
+        {selected && (
+          <Card style={{ alignSelf: "start", fontSize: 12 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, maxWidth: 290, lineHeight: 1.4 }}>{selected.subject}</div>
+              <button onClick={() => setSelected(null)} style={{ background: "none", border: "none", color: C.muted, cursor: "pointer", fontSize: 20, lineHeight: 1, flexShrink: 0 }}>×</button>
+            </div>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
+              {selected.status && <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 6, background: selected.status === "Closed" ? "#F0FDF4" : "#EFF6FF", color: selected.status === "Closed" ? "#16A34A" : "#1D4ED8", fontWeight: 500 }}>{selected.status}</span>}
+              {selected.channel && <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 6, background: `${CH_COLORS[selected.channel] || "#94A3B8"}22`, color: CH_COLORS[selected.channel] || "#94A3B8", fontWeight: 500 }}>{selected.channel}</span>}
+              {selected.priority && <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 6, background: "#FEF3C7", color: "#92400E", fontWeight: 500 }}>{selected.priority}</span>}
+            </div>
+            {[
+              ["Reason", selected.reason],
+              ["Sub-Reason", selected.subReason],
+              ["Created", (selected.createdTime || "").slice(0, 16).replace("T", " ")],
+              ["Closed", (selected.closedTime || "").slice(0, 16).replace("T", " ") || "—"],
+              ["CSAT", selected.happiness || "—"],
+              ["SLA", selected.slaViolation || "—"],
+              ["Escalated", selected.isEscalated ? "Yes ⚠️" : "No"],
+              ["Escalation V.", selected.escalationValidity || "—"],
+              ["Merchant", selected.merchantName || "—"],
+              ["Country", selected.country || "—"],
+              ["Language", selected.language || "—"],
+              ["Tags", selected.tags || "—"],
+              ["Reassigns", selected.numReassign],
+              ["Reopens", selected.numReopen],
+              ["User ID", selected.userId || "—"],
+              ["Order ID", selected.orderId || "—"],
+            ].map(([label, val]) => (
+              <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", borderBottom: `1px solid ${C.border}` }}>
+                <span style={{ color: C.muted, flexShrink: 0, marginRight: 8 }}>{label}</span>
+                <span style={{ fontWeight: 500, textAlign: "right", wordBreak: "break-word", color: label === "CSAT" ? HP_COLORS[val] || C.text : label === "Escalated" && val.startsWith("Yes") ? "#EF4444" : C.text }}>{val}</span>
+              </div>
+            ))}
+          </Card>
+        )}
+      </div>
     </div>
   );
 }
@@ -666,7 +1221,7 @@ function PipelineTab({ merchants, onMerchantClick, statuses, onStatusChange }) {
   const pageSize = 100;
 
   const allCities = useMemo(() => ["All", ...new Set(merchants.map(m => m.City).filter(Boolean))].sort(), [merchants]);
-  
+
   // Mall list depends on selected city
   const allMalls = useMemo(() => {
     const list = city === "All" ? merchants : merchants.filter(m => m.City === city);
@@ -944,7 +1499,8 @@ function MallsTab({ merchants, onMerchantClick, statuses, onStatusChange }) {
                       </td>
                       <td style={{ padding: "10px 12px", color: C.sub }}>{m.Category}</td>
                       <td style={{ padding: "10px 12px" }}>
-                        <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 7px", borderRadius: 4,
+                        <span style={{
+                          fontSize: 10, fontWeight: 600, padding: "2px 7px", borderRadius: 4,
                           background: m.Priority.toLowerCase().includes("high") ? "#FEE2E2" : m.Priority.toLowerCase().includes("medium") ? "#FEF3C7" : "#F0FDF4",
                           color: m.Priority.toLowerCase().includes("high") ? "#DC2626" : m.Priority.toLowerCase().includes("medium") ? "#92400E" : "#15803D"
                         }}>{m.Priority}</span>
@@ -1086,15 +1642,42 @@ export default function App() {
   const [statuses, setStatuses] = useState({});  // { "MerchantName|Mall": "status" }
   const [statusSaving, setStatusSaving] = useState(false); // eslint-disable-line no-unused-vars
 
+  // ── Support / CRM data ──────────────────────────────────────
+  const [tickets, setTickets] = useState([]);
+  const [ticketsLoaded, setTicketsLoaded] = useState(false);
+  const [ticketsLoading, setTicketsLoading] = useState(false);
+
   const handleMerchantClick = (merchant) => {
     setSelectedMerchantForProfile(merchant);
     setTab("profiler");
+  };
+
+  const handleTabChange = (id) => {
+    setTab(id);
+    if (["support", "agents", "tickets"].includes(id)) {
+      loadTickets();
+    }
   };
 
   useEffect(() => {
     if (session && anonKey) loadAllMerchants();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session]);
+
+  // Lazy-load tickets only when a support tab is first opened
+  async function loadTickets() {
+    if (ticketsLoaded || ticketsLoading) return;
+    setTicketsLoading(true);
+    try {
+      const cols = "id,ticket_id,subject,status,channel,priority,reason,sub_reason,ticket_owner,created_time,closed_time,happiness_rating,resolution_time_ms,num_reassign,num_reopen,is_overdue,is_escalated,sla_violation_type,escalation_validity,merchant_name,country,language,tags,user_id,order_id";
+      const rows = await sbFetch("zoho_tickets", anonKey, session.access_token, cols);
+      setTickets(Array.isArray(rows) ? rows.map(normTicket) : []);
+      setTicketsLoaded(true);
+    } catch (e) {
+      console.warn("Tickets load failed:", e.message);
+    }
+    setTicketsLoading(false);
+  }
 
   async function loadAllMerchants() {
     const all = [];
@@ -1158,7 +1741,7 @@ export default function App() {
     { id: "macro", label: "Market Overview", d: "M4 15l4-8 4 4 4-6 4 6" },
     { id: "profiler", label: "Merchant Profiler", d: "M12 12c2.7 0 5-2.3 5-5s-2.3-5-5-5-5 2.3-5 5 2.3 5 5 5zm0 2c-3.3 0-10 1.7-10 5v1h20v-1c0-3.3-6.7-5-10-5z" },
     { id: "malls", label: "Malls Profile", d: "M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4zM3 6h18M16 10a4 4 0 01-8 0" },
-    { id: "pipeline", label: "Merchant Pipeline", d: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" },
+    { id: "pipeline", label: "Merchant Acquisition Pipeline", d: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" },
   ];
 
   const canonicalMap = useMemo(() => {
@@ -1216,22 +1799,47 @@ export default function App() {
           <div style={{ fontSize: 11, color: C.muted, fontWeight: 500 }}>KSA Merchant Intelligence</div>
         </div>
 
-        <nav style={{ padding: "10px 8px", flex: 1 }}>
-          {TABS.map(({ id, label, d }) => (
-            <div key={id} onClick={() => setTab(id)} style={{ display: "flex", alignItems: "center", gap: 9, padding: "9px 10px", borderRadius: 8, cursor: "pointer", fontSize: 13, color: tab === id ? C.accent : C.sub, background: tab === id ? C.accentL : "transparent", fontWeight: tab === id ? 500 : 400, marginBottom: 2, transition: "all .12s" }}>
-              <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d={d} /></svg>
-              {label}
+        <nav style={{ padding: "10px 8px", flex: 1, overflowY: "auto" }}>
+          {["KSA Intelligence", "CRM & Support"].map(group => (
+            <div key={group}>
+              <div style={{ fontSize: 9, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: 1, padding: "8px 10px 4px", marginTop: group === "CRM & Support" ? 8 : 0 }}>
+                {group}
+              </div>
+              {TABS.filter(t => t.group === group).map(({ id, label, d }) => (
+                <div key={id} onClick={() => handleTabChange(id)} style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 10px", borderRadius: 8, cursor: "pointer", fontSize: 12, color: tab === id ? C.accent : C.sub, background: tab === id ? C.accentL : "transparent", fontWeight: tab === id ? 600 : 400, marginBottom: 1, transition: "all .12s" }}>
+                  <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d={d} /></svg>
+                  <span style={{ lineHeight: 1.3 }}>{label}</span>
+                  {group === "CRM & Support" && ticketsLoading && tab === id && (
+                    <span style={{ marginLeft: "auto", fontSize: 9, color: C.muted }}>loading…</span>
+                  )}
+                </div>
+              ))}
             </div>
           ))}
         </nav>
 
         <div style={{ padding: "12px 16px", borderTop: `1px solid ${C.border}`, fontSize: 11, color: C.muted }}>
+          <div style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 }}>Merchants</div>
           {sidebarStats.map(([l, v]) => (
             <div key={l} style={{ display: "flex", justifyContent: "space-between", padding: "2px 0" }}>
               <span>{l}</span><span style={{ color: C.text, fontWeight: 500 }}>{v}</span>
             </div>
           ))}
-          <button onClick={() => { setSession(null); setMerchants([]); }}
+          {ticketsLoaded && (
+            <>
+              <div style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, marginTop: 8, marginBottom: 4 }}>Support</div>
+              {[
+                ["Tickets", tickets.length.toLocaleString()],
+                ["CSAT", (() => { const r = tickets.filter(t => t.happiness); const g = r.filter(t => t.happiness === "Good").length; return r.length ? `${Math.round(g / r.length * 100)}%` : "—"; })()],
+                ["Agents", new Set(tickets.map(t => t.owner).filter(Boolean)).size],
+              ].map(([l, v]) => (
+                <div key={l} style={{ display: "flex", justifyContent: "space-between", padding: "2px 0" }}>
+                  <span>{l}</span><span style={{ color: C.text, fontWeight: 500 }}>{v}</span>
+                </div>
+              ))}
+            </>
+          )}
+          <button onClick={() => { setSession(null); setMerchants([]); setTickets([]); setTicketsLoaded(false); }}
             style={{ marginTop: 10, width: "100%", padding: "6px 0", background: "#F4F2EE", border: "none", borderRadius: 6, fontSize: 11, color: C.muted, cursor: "pointer" }}>
             Sign Out
           </button>
@@ -1244,6 +1852,15 @@ export default function App() {
         {tab === "profiler" && <ProfilerTab merchants={unifiedMerchants} anonKey={anonKey} initialMerchant={selectedMerchantForProfile} />}
         {tab === "malls" && <MallsTab merchants={unifiedMerchants} onMerchantClick={handleMerchantClick} statuses={statuses} onStatusChange={handleStatusChange} />}
         {tab === "pipeline" && <PipelineTab merchants={unifiedMerchants} onMerchantClick={handleMerchantClick} statuses={statuses} onStatusChange={handleStatusChange} />}
+        {tab === "support" && (ticketsLoading
+          ? <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "60vh", color: C.muted, fontSize: 13 }}>Loading {tickets.length.toLocaleString()} tickets…</div>
+          : <SupportTab tickets={tickets} />)}
+        {tab === "agents" && (ticketsLoading
+          ? <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "60vh", color: C.muted, fontSize: 13 }}>Loading tickets…</div>
+          : <AgentsTab tickets={tickets} />)}
+        {tab === "tickets" && (ticketsLoading
+          ? <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "60vh", color: C.muted, fontSize: 13 }}>Loading tickets…</div>
+          : <TicketExplorerTab tickets={tickets} />)}
       </main>
     </div>
   );

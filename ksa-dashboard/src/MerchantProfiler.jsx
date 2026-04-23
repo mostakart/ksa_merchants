@@ -213,7 +213,7 @@ function CompareView({ results, loading, streamText }) {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export default function MerchantProfiler({ initialMerchant, embedded }) {
+export default function MerchantProfiler({ initialMerchant, embedded, tickets = [] }) {
     const [activeModel, setActiveModel] = useState(MODELS[0].id);
     const [compareMode, setCompareMode] = useState(false);
     const [merchantName, setMerchantName] = useState(initialMerchant ? initialMerchant.Merchant : "");
@@ -232,6 +232,28 @@ export default function MerchantProfiler({ initialMerchant, embedded }) {
             setError(null);
         }
     }, [initialMerchant]);
+
+    // --- CRM Integration ---
+    const merchantTickets = useMemo(() => {
+        if (!merchantName) return [];
+        const n = merchantName.toLowerCase();
+        return tickets.filter(t => 
+            (t.merchantName && t.merchantName.toLowerCase().includes(n)) || 
+            (t.subject && t.subject.toLowerCase().includes(n))
+        ).sort((a, b) => b.createdTime.localeCompare(a.createdTime));
+    }, [merchantName, tickets]);
+
+    const crmStats = useMemo(() => {
+        if (!merchantTickets.length) return null;
+        const analyzed = merchantTickets.filter(t => t.aiStatus === "completed");
+        return {
+            total: merchantTickets.length,
+            churnRisk: merchantTickets.some(t => t.isChurnIntent),
+            avgScore: analyzed.length ? (analyzed.reduce((s, t) => s + t.overallQualityScore, 0) / analyzed.length).toFixed(1) : null,
+            topIssue: analyzed[0]?.issueType || "Mixed",
+            monetaryImpact: merchantTickets.reduce((s, t) => s + (t.monetaryValue || 0), 0)
+        };
+    }, [merchantTickets]);
 
     const runSingle = useCallback(async (model) => {
         setLoading((p) => ({ ...p, [model]: true }));
@@ -271,7 +293,7 @@ export default function MerchantProfiler({ initialMerchant, embedded }) {
     const isAnyLoading = Object.values(loading).some(Boolean);
 
     return (
-        <div style={embedded ? { width: "100%" } : styles.root}>
+        <div style={embedded ? { width: "100%", padding: 20, boxSizing: "border-box" } : styles.root}>
             {!embedded && (
                 <>
                     <h2 style={styles.title}>AI Merchant Profiler</h2>
@@ -279,75 +301,145 @@ export default function MerchantProfiler({ initialMerchant, embedded }) {
                 </>
             )}
 
-            {/* Model Controls */}
-            <div style={styles.controls}>
-                <ModelToggle
-                    models={MODELS}
-                    activeModel={activeModel}
-                    onChange={setActiveModel}
-                    disabled={compareMode || isAnyLoading}
-                />
-                <label style={styles.compareToggle}>
-                    <input
-                        type="checkbox"
-                        checked={compareMode}
-                        onChange={(e) => setCompareMode(e.target.checked)}
+            <div style={{ display: "grid", gridTemplateColumns: merchantTickets.length > 0 ? "1fr 320px" : "1fr", gap: 24 }}>
+                <div>
+                    {/* Model Controls */}
+                    <div style={styles.controls}>
+                        <ModelToggle
+                            models={MODELS}
+                            activeModel={activeModel}
+                            onChange={setActiveModel}
+                            disabled={compareMode || isAnyLoading}
+                        />
+                        <label style={styles.compareToggle}>
+                            <input
+                                type="checkbox"
+                                checked={compareMode}
+                                onChange={(e) => setCompareMode(e.target.checked)}
+                                disabled={isAnyLoading}
+                            />
+                            &nbsp; Side-by-side compare
+                        </label>
+                    </div>
+
+                    {/* Inputs */}
+                    <div style={styles.inputGroup}>
+                        <input
+                            style={styles.input}
+                            placeholder="Merchant name (e.g. مطعم الأصيل)"
+                            value={merchantName}
+                            onChange={(e) => setMerchantName(e.target.value)}
+                        />
+                        <textarea
+                            style={styles.textarea}
+                            placeholder="Paste customer reviews here (Arabic or English)…"
+                            rows={6}
+                            value={reviews}
+                            onChange={(e) => setReviews(e.target.value)}
+                        />
+                    </div>
+
+                    <button
+                        style={{ ...styles.analyzeBtn, opacity: isAnyLoading ? 0.6 : 1 }}
+                        onClick={handleAnalyze}
                         disabled={isAnyLoading}
-                    />
-                    &nbsp; Side-by-side compare
-                </label>
-            </div>
+                    >
+                        {isAnyLoading ? "Analyzing…" : compareMode ? "Compare Both Models" : "Analyze Merchant"}
+                    </button>
 
-            {/* Inputs */}
-            <div style={styles.inputGroup}>
-                <input
-                    style={styles.input}
-                    placeholder="Merchant name (e.g. مطعم الأصيل)"
-                    value={merchantName}
-                    onChange={(e) => setMerchantName(e.target.value)}
-                />
-                <textarea
-                    style={styles.textarea}
-                    placeholder="Paste customer reviews here (Arabic or English)…"
-                    rows={6}
-                    value={reviews}
-                    onChange={(e) => setReviews(e.target.value)}
-                />
-            </div>
-
-            <button
-                style={{ ...styles.analyzeBtn, opacity: isAnyLoading ? 0.6 : 1 }}
-                onClick={handleAnalyze}
-                disabled={isAnyLoading}
-            >
-                {isAnyLoading ? "Analyzing…" : compareMode ? "Compare Both Models" : "Analyze Merchant"}
-            </button>
-
-            {/* Error Banner */}
-            {error && (
-                <div style={styles.errorBanner}>
-                    <strong>Error:</strong> {error}
-                </div>
-            )}
-
-            {/* Results */}
-            {compareMode ? (
-                <CompareView results={results} loading={loading} streamText={streamText} />
-            ) : (
-                <>
-                    {loading[activeModel] && (
-                        <div style={styles.loadingBox}>
-                            <div style={styles.spinner} />
-                            <pre style={styles.streamPreview}>{streamText[activeModel] || "Waiting for model…"}</pre>
+                    {/* Error Banner */}
+                    {error && (
+                        <div style={styles.errorBanner}>
+                            <strong>Error:</strong> {error}
                         </div>
                     )}
-                    <ProfileCard
-                        result={results[activeModel]}
-                        model={activeModel}
-                        label={MODELS.find((m) => m.id === activeModel)?.label}
-                    />
-                </>
-            )}
+
+                    {/* Results */}
+                    {compareMode ? (
+                        <CompareView results={results} loading={loading} streamText={streamText} />
+                    ) : (
+                        <>
+                            {loading[activeModel] && (
+                                <div style={styles.loadingBox}>
+                                    <div style={styles.spinner} />
+                                    <pre style={styles.streamPreview}>{streamText[activeModel] || "Waiting for model…"}</pre>
+                                </div>
+                            )}
+                            <ProfileCard
+                                result={results[activeModel]}
+                                model={activeModel}
+                                label={MODELS.find((m) => m.id === activeModel)?.label}
+                            />
+                        </>
+                    )}
+                </div>
+
+                {/* CRM Support History Section */}
+                {merchantTickets.length > 0 && (
+                    <div style={{ borderLeft: "1px solid #e5e7eb", paddingLeft: 24 }}>
+                        <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
+                            <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" /></svg>
+                            CRM Support History
+                        </h3>
+
+                        {crmStats && (
+                            <div style={{ background: "#F9FAFB", borderRadius: 12, padding: 16, marginBottom: 20 }}>
+                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
+                                    <div>
+                                        <div style={{ fontSize: 10, color: "#6B7280", textTransform: "uppercase" }}>Total Tickets</div>
+                                        <div style={{ fontSize: 20, fontWeight: 700 }}>{crmStats.total}</div>
+                                    </div>
+                                    {crmStats.avgScore && (
+                                        <div>
+                                            <div style={{ fontSize: 10, color: "#6B7280", textTransform: "uppercase" }}>Avg AI Quality</div>
+                                            <div style={{ fontSize: 20, fontWeight: 700, color: crmStats.avgScore >= 7 ? "#16A34A" : "#D97706" }}>{crmStats.avgScore}</div>
+                                        </div>
+                                    )}
+                                </div>
+                                {crmStats.churnRisk && (
+                                    <div style={{ background: "#FEE2E2", color: "#DC2626", padding: "8px 12px", borderRadius: 8, fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", gap: 6, marginBottom: 12 }}>
+                                        ⚠️ Churn Risk Detected
+                                    </div>
+                                )}
+                                {crmStats.monetaryImpact > 0 && (
+                                    <div style={{ fontSize: 11, color: "#6B7280" }}>
+                                        Total Monetary Impact: <span style={{ fontWeight: 600, color: "#111827" }}>{crmStats.monetaryImpact.toLocaleString()} SAR</span>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                            <div style={{ fontSize: 10, fontWeight: 700, color: "#9CA3AF", textTransform: "uppercase" }}>Recent Tickets</div>
+                            {merchantTickets.slice(0, 5).map(t => (
+                                <div key={t.id} style={{ padding: 12, borderRadius: 10, border: "1px solid #F3F4F6", background: "#FFF" }}>
+                                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                                        <span style={{ fontSize: 11, fontWeight: 600, color: "#374151" }}>#{t.id}</span>
+                                        <span style={{ fontSize: 10, color: "#9CA3AF" }}>{t.createdTime.slice(0, 10)}</span>
+                                    </div>
+                                    <div style={{ fontSize: 12, fontWeight: 500, marginBottom: 6, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.subject}</div>
+                                    <div style={{ display: "flex", gap: 4 }}>
+                                        {t.finalSentiment && (
+                                            <span style={{ 
+                                                fontSize: 9, padding: "2px 6px", borderRadius: 4, 
+                                                background: t.finalSentiment.includes("Positive") ? "#DCFCE7" : "#FEE2E2",
+                                                color: t.finalSentiment.includes("Positive") ? "#16A34A" : "#DC2626",
+                                                fontWeight: 600
+                                            }}>{t.finalSentiment}</span>
+                                        )}
+                                        {t.issueType && <span style={{ fontSize: 9, padding: "2px 6px", borderRadius: 4, background: "#F3F4F6", color: "#6B7280" }}>{t.issueType}</span>}
+                                    </div>
+                                </div>
+                            ))}
+                            {merchantTickets.length > 5 && (
+                                <div style={{ textAlign: "center", fontSize: 11, color: "#6B7280", marginTop: 4 }}>
+                                    + {merchantTickets.length - 5} more tickets
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+            </div>
         </div>
     );
 }

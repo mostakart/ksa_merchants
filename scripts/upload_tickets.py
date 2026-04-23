@@ -70,13 +70,12 @@ def safe_int(v):
     except Exception:
         return None
 
-def safe_bigint(v):
+def safe_float(v):
     try:
         s = str(v).strip()
         if s.lower() in ("", "none", "nan", "null"):
             return None
-        val = int(float(s))
-        return val if val > 0 else None
+        return float(s.replace(",", ""))
     except Exception:
         return None
 
@@ -84,9 +83,9 @@ def safe_bool(v):
     if v is None:
         return None
     s = str(v).strip().lower()
-    if s in ("true", "1", "yes"):
+    if s in ("true", "1", "yes", "y", "t"):
         return True
-    if s in ("false", "0", "no"):
+    if s in ("false", "0", "no", "n", "f"):
         return False
     return None
 
@@ -94,80 +93,95 @@ def safe_ts(v):
     if not v or str(v).strip().lower() in ("none", "nan", "null", ""):
         return None
     s = str(v).strip()
-    # Zoho format: "2025-12-03 20:35:48"
+    # Handle multiple formats if needed, but standard ISO or Zoho format usually works
     try:
-        dt = datetime.strptime(s, "%Y-%m-%d %H:%M:%S")
-        return dt.isoformat() + "Z"
+        if " " in s and ":" in s:
+            dt = datetime.strptime(s, "%Y-%m-%d %H:%M:%S")
+            return dt.isoformat() + "Z"
+        return s # Fallback to raw if it looks like ISO
     except ValueError:
-        return None
+        return s
 
-def clean_subject(v):
-    if not v:
-        return None
-    import re
-    s = re.sub(r"<[^>]+>", " ", str(v)).strip()
-    s = re.sub(r"\s+", " ", s)
-    return s[:500] if s else None
-
-# ─── Row mapper ───────────────────────────────────────────────
-def map_row(row):
+# ─── Row mappers ──────────────────────────────────────────────
+def map_ticket_row(row):
     return {
-        "ticket_id":               safe_str(row.get("ID")),
-        "subject":                 clean_subject(row.get("Subject")),
-        "status":                  safe_str(row.get("Status")),
-        "channel":                 safe_str(row.get("Channel")),
-        "priority":                safe_str(row.get("Priority")),
-        "reason":                  safe_str(row.get("Reason")),
-        "sub_reason":              safe_str(row.get("Sub Reason")),
-        "ticket_owner":            safe_str(row.get("Ticket Owner")),
-        "created_time":            safe_ts(row.get("Created Time")),
-        "closed_time":             safe_ts(row.get("Ticket Closed Time")),
-        "happiness_rating":        safe_str(row.get("Happiness Rating")),
-        "resolution_time_ms":      safe_bigint(row.get("Resolution Time in Business Hours")),
-        "first_response_time_ms":  safe_bigint(row.get("First Response Time in Business Hours")),
-        "total_response_time_ms":  safe_bigint(row.get("Total Response Time in Business Hours")),
-        "num_threads":             safe_int(row.get("Number of Threads")),
-        "num_responses":           safe_int(row.get("Number of Responses")),
-        "num_reassign":            safe_int(row.get("Number of Reassign")),
-        "num_reopen":              safe_int(row.get("Number of Reopen")),
-        "is_overdue":              safe_bool(row.get("Is Overdue")),
-        "is_escalated":            safe_bool(row.get("Is Escalated")),
-        "escalation_validity":     safe_str(row.get("Escalation Validity")),
-        "sla_violation_type":      safe_str(row.get("SLA Violation Type")),
-        "sla_name":                safe_str(row.get("SLA Name")),
-        "team_id":                 safe_str(row.get("Team Id")),
-        "tags":                    safe_str(row.get("Tags")),
-        "total_time_spent":        safe_int(row.get("Total Time Spent")),
-        "merchant_name":           safe_str(row.get("Merchant Name")),
-        "branch_name":             safe_str(row.get("Branch Name")),
-        "country":                 safe_str(row.get("Country")),
-        "language":                safe_str(row.get("Language")),
-        "user_id":                 safe_str(row.get("User_ID")),
-        "order_id":                safe_str(row.get("Order_ID")),
-        "transaction_id":          safe_str(row.get("Transaction_ID")),
+        "ticket_number":     safe_str(row.get("ticket_number")),
+        "channel":           safe_str(row.get("channel")),
+        "status":            safe_str(row.get("status")),
+        "department_id":     safe_str(row.get("department_id")),
+        "assignee":          safe_str(row.get("assignee")),
+        "customer_email":    safe_str(row.get("customer_email")),
+        "customer_phone":    safe_str(row.get("customer_phone")),
+        "tags":              safe_str(row.get("tags")),
+        "message_direction": safe_str(row.get("message_direction")),
+        "sender_name":       safe_str(row.get("sender_name")),
+        "message":           safe_str(row.get("message")),
+        "has_attachments":   safe_bool(row.get("has_attachments")),
+        "ticket_time":       safe_ts(row.get("ticket_time")),
+    }
+
+def map_analysis_row(row):
+    return {
+        "ticket_number":               safe_str(row.get("ticket_number")),
+        "p_issue_type":                safe_str(row.get("p_issue_type")),
+        "p_merchant_name":             safe_str(row.get("p_merchant_name")),
+        "p_merchant_issue_type":       safe_str(row.get("p_merchant_issue_type")),
+        "p_payment_blocker":           safe_bool(row.get("p_payment_blocker")),
+        "p_refund_requested":          safe_bool(row.get("p_refund_requested")),
+        "p_ux_friction_point":         safe_str(row.get("p_ux_friction_point")),
+        "p_missing_feature":           safe_str(row.get("p_missing_feature")),
+        "p_root_cause_owner":          safe_str(row.get("p_root_cause_owner")),
+        "p_smart_tags":                safe_str(row.get("p_smart_tags")),
+        "mer_branch_name":             safe_str(row.get("mer_branch_name")),
+        "m_promo_code_used":           safe_str(row.get("m_promo_code_used")),
+        "fin_ticket_monetary_value":   safe_float(row.get("fin_ticket_monetary_value")),
+        "c_misleading_wording_exact":  safe_str(row.get("c_misleading_wording_exact")),
+        "f_fraud_suspicion":           safe_bool(row.get("f_fraud_suspicion")),
+        "cs_escalation_department":    safe_str(row.get("cs_escalation_department")),
+        "s_initial_sentiment":         safe_str(row.get("s_initial_sentiment")),
+        "s_final_sentiment":           safe_str(row.get("s_final_sentiment")),
+        "s_sentiment_shift":           safe_str(row.get("s_sentiment_shift")),
+        "s_churn_intent":              safe_bool(row.get("s_churn_intent")),
+        "s_customer_effort_score":     safe_int(row.get("s_customer_effort_score")),
+        "s_profanity_detected":        safe_bool(row.get("s_profanity_detected")),
+        "s_gratitude_detected":        safe_bool(row.get("s_gratitude_detected")),
+        "s_sentiment_summary":         safe_str(row.get("s_sentiment_summary")),
+        "a_empathy_score":             safe_int(row.get("a_empathy_score")),
+        "a_policy_compliance":         safe_bool(row.get("a_policy_compliance")),
+        "a_grammar_professionalism":   safe_int(row.get("a_grammar_professionalism")),
+        "a_knowledge_accuracy":        safe_int(row.get("a_knowledge_accuracy")),
+        "a_is_template_heavy":         safe_bool(row.get("a_is_template_heavy")),
+        "a_one_touch_resolution":      safe_bool(row.get("a_one_touch_resolution")),
+        "a_escalated":                 safe_bool(row.get("a_escalated")),
+        "a_overall_score":             safe_float(row.get("a_overall_score")),
+        "a_evaluation_notes":          safe_str(row.get("a_evaluation_notes")),
+        "ai_status":                   safe_str(row.get("ai_status")),
+        "ai_model_used":               safe_str(row.get("ai_model_used")),
+        "analyzed_at":                 safe_ts(row.get("analyzed_at")),
     }
 
 # ─── Supabase helpers ─────────────────────────────────────────
 import requests
 
-def upload_batch(records):
+def upload_batch(records, table):
     """Upsert a batch. Returns (ok, success_count, error_text)."""
-    url = f"{SUPABASE_URL}/rest/v1/{TABLE}"
-    h = {**HEADERS, "Prefer": "resolution=ignore-duplicates,return=minimal"}
+    url = f"{SUPABASE_URL}/rest/v1/{table}"
+    # Use ticket_number as the resolution key for both tables
+    h = {**HEADERS, "Prefer": "resolution=merge-duplicates,return=minimal"}
     r = requests.post(url, headers=h, data=json.dumps(records, ensure_ascii=False, default=str).encode("utf-8"), timeout=60)
     if r.status_code in (200, 201):
         return True, len(records), ""
     return False, 0, r.text[:300]
 
-def get_existing_ids():
-    """Fetch all ticket_ids already in Supabase (for resume mode)."""
-    print("  Fetching existing ticket IDs from Supabase…")
+def get_existing_ids(table):
+    """Fetch all ticket_numbers already in Supabase."""
+    print(f"  Fetching existing ticket numbers from {table}…")
     ids = set()
     offset = 0
-    limit = 1000
+    limit = 2000
     while True:
         r = requests.get(
-            f"{SUPABASE_URL}/rest/v1/{TABLE}?select=ticket_id&limit={limit}&offset={offset}",
+            f"{SUPABASE_URL}/rest/v1/{table}?select=ticket_number&limit={limit}&offset={offset}",
             headers=HEADERS, timeout=30
         )
         if not r.ok:
@@ -176,72 +190,54 @@ def get_existing_ids():
         batch = r.json()
         if not batch:
             break
-        ids.update(row["ticket_id"] for row in batch if row.get("ticket_id"))
+        ids.update(row["ticket_number"] for row in batch if row.get("ticket_number"))
         offset += limit
         if len(batch) < limit:
             break
     return ids
 
-# ─── Main ─────────────────────────────────────────────────────
-def main():
-    parser = argparse.ArgumentParser(description="Upload Zoho tickets to Supabase")
-    parser.add_argument("--csv", required=True, help="Path to Cases__1.csv")
-    parser.add_argument("--resume", action="store_true", help="Skip already-uploaded ticket IDs")
-    args = parser.parse_args()
-
-    csv_path = Path(args.csv)
-    if not csv_path.exists():
-        print(f"❌  File not found: {csv_path}")
-        sys.exit(1)
-
-    print("╔══════════════════════════════════════════════════╗")
-    print("║   Waffarha — Zoho Ticket Uploader               ║")
-    print(f"║   File: {csv_path.name:41s}║")
-    print("╚══════════════════════════════════════════════════╝\n")
-    print(f"  Supabase: {SUPABASE_URL}")
-    print(f"  Table:    {TABLE}")
-    print(f"  Batch:    {BATCH_SIZE} rows\n")
-
+# ─── Main Logic ───────────────────────────────────────────────
+def process_upload(path, table, mapper, resume):
+    print(f"\n🚀 Processing {table} from {path.name}…")
+    
     existing_ids = set()
-    if args.resume:
-        existing_ids = get_existing_ids()
-        print(f"  Resume mode: {len(existing_ids):,} tickets already uploaded\n")
+    if resume:
+        existing_ids = get_existing_ids(table)
+        print(f"  Resume mode: {len(existing_ids):,} records already in DB\n")
 
-    # ── Read CSV ──
-    print("📂  Reading CSV…")
     all_records = []
     skipped = 0
-    with open(csv_path, encoding="utf-8-sig", errors="replace") as f:
+    
+    # Handle both CSV and TXT (if TXT is comma-separated)
+    encoding = "utf-8-sig" if path.suffix == ".csv" else "utf-8"
+    
+    with open(path, encoding=encoding, errors="replace") as f:
         reader = csv.DictReader(f)
         for row in reader:
-            mapped = map_row(row)
-            tid = mapped.get("ticket_id")
-            if not tid:
+            mapped = mapper(row)
+            tnum = mapped.get("ticket_number")
+            if not tnum:
                 skipped += 1
                 continue
-            if args.resume and tid in existing_ids:
+            if resume and tnum in existing_ids:
                 skipped += 1
                 continue
             all_records.append(mapped)
 
-    print(f"  Rows to upload: {len(all_records):,}  (skipped: {skipped:,})\n")
+    total = len(all_records)
+    print(f"  Rows to upload: {total:,}  (skipped: {skipped:,})")
 
     if not all_records:
-        print("✅  Nothing to upload.")
         return
 
-    # ── Upload in batches ──
-    total = len(all_records)
     success = 0
     failed = 0
     n_batches = math.ceil(total / BATCH_SIZE)
 
-    print(f"🚀  Uploading {total:,} rows in {n_batches} batches…\n")
     t0 = time.time()
-
     for i in range(0, total, BATCH_SIZE):
         batch = all_records[i: i + BATCH_SIZE]
-        ok, cnt, err = upload_batch(batch)
+        ok, cnt, err = upload_batch(batch, table)
         if ok:
             success += cnt
         else:
@@ -251,16 +247,42 @@ def main():
         pct = int(success / total * 100)
         elapsed = time.time() - t0
         rate = success / elapsed if elapsed > 0 else 0
-        eta = (total - success) / rate if rate > 0 else 0
-        print(f"  [{pct:3d}%] {success:,}/{total:,} rows  |  {rate:.0f} rows/s  |  ETA {eta:.0f}s   ", end="\r")
-        time.sleep(0.1)
+        print(f"  [{pct:3d}%] {success:,}/{total:,} rows  |  {rate:.0f} rows/s   ", end="\r")
 
-    elapsed = time.time() - t0
-    print(f"\n\n{'═' * 52}")
-    print(f"✅  Done in {elapsed:.1f}s")
-    print(f"   Uploaded : {success:,}")
-    print(f"   Failed   : {failed:,}")
-    print("═" * 52)
+    print(f"\n  ✅ {table} upload complete: {success:,} success, {failed:,} failed")
+
+def main():
+    parser = argparse.ArgumentParser(description="Upload Zoho tickets and Analysis to Supabase")
+    parser.add_argument("--tickets", help="Path to tickets_rows.txt or .csv")
+    parser.add_argument("--analysis", help="Path to ticket_analysis_rows.csv")
+    parser.add_argument("--resume", action="store_true", help="Skip existing records")
+    args = parser.parse_args()
+
+    if not args.tickets and not args.analysis:
+        parser.print_help()
+        sys.exit(1)
+
+    print("╔══════════════════════════════════════════════════╗")
+    print("║   Waffarha — CRM Data Ingestion Tool            ║")
+    print("╚══════════════════════════════════════════════════╝\n")
+    print(f"  Supabase: {SUPABASE_URL}")
+
+    if args.tickets:
+        p = Path(args.tickets)
+        if p.exists():
+            process_upload(p, "zoho_tickets", map_ticket_row, args.resume)
+        else:
+            print(f"❌  Tickets file not found: {args.tickets}")
+
+    if args.analysis:
+        p = Path(args.analysis)
+        if p.exists():
+            process_upload(p, "ticket_analysis", map_analysis_row, args.resume)
+        else:
+            print(f"❌  Analysis file not found: {args.analysis}")
+
+if __name__ == "__main__":
+    main()
 
 if __name__ == "__main__":
     main()

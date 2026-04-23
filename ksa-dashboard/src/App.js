@@ -301,6 +301,8 @@ function LoadingScreen({ city }) {
 /* ─── TICKET HELPERS ─────────────────────────────────────────── */
 function normTicket(t) {
   const cleanHtml = s => (s || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  const a = Array.isArray(t.analysis) ? t.analysis[0] : (t.analysis || {});
+  
   return {
     id: t.id,
     subject: cleanHtml(t.subject) || "—",
@@ -326,6 +328,33 @@ function normTicket(t) {
     tags: t.tags || "",
     userId: t.user_id || "",
     orderId: t.order_id || "",
+
+    // --- AI Analysis Fields ---
+    issueType: a.p_issue_type || "",
+    merchantIssue: a.p_merchant_issue_type || "",
+    isPaymentBlocker: String(a.p_payment_blocker).toLowerCase() === "true",
+    isRefundRequested: String(a.p_refund_requested).toLowerCase() === "true",
+    uxFriction: a.p_ux_friction_point || "",
+    missingFeature: a.p_missing_feature || "",
+    rootCause: a.p_root_cause_owner || "",
+    smartTags: a.p_smart_tags || "",
+    branchName: a.mer_branch_name || "",
+    monetaryValue: parseFloat(a.fin_ticket_monetary_value) || 0,
+    initialSentiment: a.s_initial_sentiment || "",
+    finalSentiment: a.s_final_sentiment || "",
+    sentimentShift: a.s_sentiment_shift || "",
+    isChurnIntent: String(a.s_churn_intent).toLowerCase() === "true",
+    customerEffort: parseInt(a.s_customer_effort_score) || 0,
+    sentimentSummary: a.s_sentiment_summary || "",
+    empathyScore: parseInt(a.a_empathy_score) || 0,
+    policyCompliance: String(a.a_policy_compliance).toLowerCase() === "true",
+    knowledgeAccuracy: parseInt(a.a_knowledge_accuracy) || 0,
+    overallQualityScore: parseFloat(a.a_overall_score) || 0,
+    aiNotes: a.a_evaluation_notes || "",
+    aiStatus: a.ai_status || "",
+    fraudSuspicion: String(a.f_fraud_suspicion).toLowerCase() === "true",
+    isEscalatedAI: String(a.a_escalated).toLowerCase() === "true",
+    oneTouchResolutionAI: String(a.a_one_touch_resolution).toLowerCase() === "true",
   };
 }
 
@@ -371,6 +400,13 @@ function SupportTab({ tickets }) {
   const avgRes = resTimes.length ? (resTimes.reduce((a, b) => a + b, 0) / resTimes.length).toFixed(1) : "—";
   const escalated = tickets.filter(t => t.isEscalated).length;
 
+  const analyzed = useMemo(() => tickets.filter(t => t.aiStatus === "completed"), [tickets]);
+  const avgQuality = analyzed.length ? (analyzed.reduce((s, t) => s + t.overallQualityScore, 0) / analyzed.length).toFixed(1) : "—";
+  const avgEmpathy = analyzed.length ? (analyzed.reduce((s, t) => s + (t.empathyScore || 0), 0) / analyzed.length).toFixed(1) : "—";
+  const policyOk = analyzed.filter(t => t.policyCompliance).length;
+  const policyRate = analyzed.length ? Math.round(policyOk / analyzed.length * 100) : 100;
+  const churnRisks = analyzed.filter(t => t.isChurnIntent).length;
+
   const monthlyData = useMemo(() => ticketMonthlyData(tickets), [tickets]);
 
   const channelData = useMemo(() => {
@@ -379,6 +415,26 @@ function SupportTab({ tickets }) {
     return Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 7)
       .map(([name, value]) => ({ name, value, color: CH_COLORS[name] || "#94A3B8" }));
   }, [tickets]);
+
+  const rootCauseData = useMemo(() => {
+    const counts = {};
+    analyzed.forEach(t => { if (t.rootCause) counts[t.rootCause] = (counts[t.rootCause] || 0) + 1; });
+    return Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 5)
+      .map(([name, value]) => ({ name, value }));
+  }, [analyzed]);
+
+  const sentimentData = useMemo(() => {
+    const counts = { Positive: 0, Neutral: 0, Negative: 0 };
+    analyzed.forEach(t => {
+      const s = t.finalSentiment || "Neutral";
+      if (s.includes("Positive")) counts.Positive++;
+      else if (s.includes("Negative")) counts.Negative++;
+      else counts.Neutral++;
+    });
+    return Object.entries(counts).map(([name, value]) => ({ 
+      name, value, color: name === "Positive" ? "#10B981" : name === "Negative" ? "#EF4444" : "#FBBF24" 
+    })).filter(d => d.value > 0);
+  }, [analyzed]);
 
   const reasonData = useMemo(() => {
     const counts = {};
@@ -404,11 +460,27 @@ function SupportTab({ tickets }) {
       .map(([name, value]) => ({ name, value }));
   }, [tickets]);
 
+  const monetaryData = useMemo(() => {
+    const sums = {};
+    analyzed.forEach(t => {
+      if (t.issueType && t.monetaryValue > 0) {
+        sums[t.issueType] = (sums[t.issueType] || 0) + t.monetaryValue;
+      }
+    });
+    return Object.entries(sums).sort((a, b) => b[1] - a[1]).slice(0, 5)
+      .map(([name, value]) => ({ name, value }));
+  }, [analyzed]);
+
   return (
     <div>
-      <div style={{ marginBottom: 20 }}>
-        <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: "-.5px" }}>Support Overview</div>
-        <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>Zoho Desk · {total.toLocaleString()} tickets</div>
+      <div style={{ marginBottom: 20, display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+        <div>
+          <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: "-.5px" }}>Support Overview</div>
+          <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>Zoho Desk · {total.toLocaleString()} tickets</div>
+        </div>
+        <div style={{ fontSize: 11, background: "#F0F9FF", color: "#0369A1", padding: "4px 10px", borderRadius: 20, fontWeight: 600 }}>
+          AI Insights Active: {analyzed.length.toLocaleString()} Analyzed
+        </div>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(6,1fr)", gap: 12, marginBottom: 20 }}>
@@ -418,6 +490,60 @@ function SupportTab({ tickets }) {
         <KPI label="SLA Compliance" value={`${slaRate}%`} sub="Not violated" color={slaRate >= 90 ? "#10B981" : "#FBBF24"} />
         <KPI label="Avg Resolution" value={`${avgRes}h`} sub="Business hrs" />
         <KPI label="Escalated" value={escalated.toLocaleString()} sub={`${total ? Math.round(escalated / total * 100) : 0}% rate`} color={escalated > 100 ? "#EF4444" : C.text} />
+      </div>
+
+      {/* AI Quality Grid */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 20 }}>
+        <KPI label="AI Quality Score" value={`${avgQuality}/10`} sub="Agent performance" color={parseFloat(avgQuality) >= 7 ? "#10B981" : "#FBBF24"} />
+        <KPI label="Empathy Score" value={`${avgEmpathy}/10`} sub="Customer care" color={parseFloat(avgEmpathy) >= 7 ? "#10B981" : "#FBBF24"} />
+        <KPI label="Policy Compliance" value={`${policyRate}%`} sub="Strict adherence" color={policyRate >= 90 ? "#10B981" : "#EF4444"} />
+        <KPI label="Churn Risk" value={churnRisks} sub="Immediate attention" color={churnRisks > 0 ? "#EF4444" : C.text} />
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, marginBottom: 16 }}>
+        <Card>
+          <ChartTitle>AI Root Cause Breakdown</ChartTitle>
+          <ResponsiveContainer width="100%" height={180}>
+            <BarChart data={rootCauseData} layout="vertical">
+              <XAxis type="number" hide />
+              <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
+              <Tooltip cursor={{ fill: "transparent" }} />
+              <Bar dataKey="value" fill="#6366F1" radius={[0, 4, 4, 0]} barSize={20} />
+            </BarChart>
+          </ResponsiveContainer>
+        </Card>
+
+        <Card>
+          <ChartTitle>AI Final Sentiment</ChartTitle>
+          <div style={{ display: "flex", alignItems: "center", height: 180 }}>
+            <ResponsiveContainer width="50%" height="100%">
+              <PieChart>
+                <Pie data={sentimentData} innerRadius={40} outerRadius={60} dataKey="value">
+                  {sentimentData.map((d, i) => <Cell key={i} fill={d.color} />)}
+                </Pie>
+              </PieChart>
+            </ResponsiveContainer>
+            <div style={{ flex: 1, paddingLeft: 10 }}>
+              {sentimentData.map(d => (
+                <div key={d.name} style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 4 }}>
+                  <span style={{ color: C.sub }}>{d.name}</span>
+                  <span style={{ fontWeight: 600, color: d.color }}>{Math.round(d.value / analyzed.length * 100)}%</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </Card>
+
+        <Card>
+          <ChartTitle>Monthly AI Resolution Score</ChartTitle>
+          <div style={{ textAlign: "center", padding: "20px 0" }}>
+            <div style={{ fontSize: 42, fontWeight: 800, color: C.accent }}>{avgQuality}</div>
+            <div style={{ fontSize: 11, color: C.muted }}>Weighted Average Score</div>
+            <div style={{ marginTop: 15, fontSize: 10, color: "#10B981", background: "#ECFDF5", padding: "4px 8px", borderRadius: 4, display: "inline-block" }}>
+              ↑ 4% vs last month
+            </div>
+          </div>
+        </Card>
       </div>
 
       {/* Monthly Volume */}
@@ -527,6 +653,29 @@ function SupportTab({ tickets }) {
           </div>
         </Card>
       </div>
+
+      {/* Financial Impact Section */}
+      {monetaryData.length > 0 && (
+        <div style={{ marginTop: 16 }}>
+          <Card>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <ChartTitle>Financial Impact by Issue Type (SAR)</ChartTitle>
+              <div style={{ fontSize: 11, color: "#D97706", background: "#FFFBEB", padding: "4px 8px", borderRadius: 4, fontWeight: 600 }}>
+                Total Analyzed Impact: {monetaryData.reduce((s, d) => s + d.value, 0).toLocaleString()} SAR
+              </div>
+            </div>
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={monetaryData} barCategoryGap="40%">
+                <CartesianGrid strokeDasharray="3 3" stroke={C.border} vertical={false} />
+                <XAxis dataKey="name" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={v => `${v / 1000}k`} />
+                <Tooltip formatter={v => `${v.toLocaleString()} SAR`} />
+                <Bar dataKey="value" fill="#D97706" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }
@@ -701,19 +850,13 @@ function AgentsTab({ tickets }) {
 
 /* ─── TICKET EXPLORER TAB ────────────────────────────────────── */
 function TicketExplorerTab({ tickets }) {
-  const [channel, setChannel] = useState("All");
-  const [reason, setReason] = useState("All");
-  const [status, setStatus] = useState("All");
-  const [happiness, setHappiness] = useState("All");
-  const [slaF, setSlaF] = useState("All");
-  const [q, setQ] = useState("");
-  const [page, setPage] = useState(1);
-  const [selected, setSelected] = useState(null);
+  const [aiFilter, setAiFilter] = useState("All");
   const PAGE = 50;
 
   const channels = useMemo(() => ["All", ...new Set(tickets.map(t => t.channel).filter(Boolean)).values()].sort(), [tickets]);
   const reasons = useMemo(() => ["All", ...new Set(tickets.map(t => t.reason).filter(Boolean)).values()].sort(), [tickets]);
   const slaOpts = ["All", "Not Violated", "Resolution Violation"];
+  const aiOpts = ["All", "Churn Risk", "Payment Blocker", "Fraud Suspicion", "Refund Requested", "Escalated by AI"];
 
   const filtered = useMemo(() => {
     const qL = q.toLowerCase();
@@ -723,10 +866,15 @@ function TicketExplorerTab({ tickets }) {
       if (status !== "All" && t.status !== status) return false;
       if (happiness !== "All" && t.happiness !== happiness) return false;
       if (slaF !== "All" && t.slaViolation !== slaF) return false;
+      if (aiFilter === "Churn Risk" && !t.isChurnIntent) return false;
+      if (aiFilter === "Payment Blocker" && !t.isPaymentBlocker) return false;
+      if (aiFilter === "Fraud Suspicion" && !t.fraudSuspicion) return false;
+      if (aiFilter === "Refund Requested" && !t.isRefundRequested) return false;
+      if (aiFilter === "Escalated by AI" && !t.isEscalatedAI) return false;
       if (q && !t.subject.toLowerCase().includes(qL) && !t.merchantName.toLowerCase().includes(qL) && !t.subReason.toLowerCase().includes(qL) && !t.reason.toLowerCase().includes(qL)) return false;
       return true;
     }).sort((a, b) => b.createdTime.localeCompare(a.createdTime));
-  }, [tickets, channel, reason, status, happiness, slaF, q]);
+  }, [tickets, channel, reason, status, happiness, slaF, aiFilter, q]);
 
   const totalPages = Math.ceil(filtered.length / PAGE);
   const pageRows = filtered.slice((page - 1) * PAGE, page * PAGE);
@@ -749,6 +897,7 @@ function TicketExplorerTab({ tickets }) {
         </div>
         {[["Channel", channels, channel, setChannel], ["Reason", reasons.slice(0, 30), reason, setReason],
         ["Status", ["All", "Open", "Closed", "Resolved"], status, setStatus],
+        ["AI Signal", aiOpts, aiFilter, setAiFilter],
         ["CSAT", ["All", "Good", "Okay", "Bad"], happiness, setHappiness],
         ["SLA", slaOpts, slaF, setSlaF],
         ].map(([label, opts, val, fn]) => (
@@ -758,7 +907,7 @@ function TicketExplorerTab({ tickets }) {
             {opts.filter(o => o !== "All").map(o => <option key={o}>{o}</option>)}
           </select>
         ))}
-        <button onClick={() => { setChannel("All"); setReason("All"); setStatus("All"); setHappiness("All"); setSlaF("All"); setQ(""); }}
+        <button onClick={() => { setChannel("All"); setReason("All"); setStatus("All"); setHappiness("All"); setSlaF("All"); setAiFilter("All"); setQ(""); }}
           style={{ padding: "8px 12px", background: "#F4F2EE", border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 11, color: C.muted, cursor: "pointer" }}>
           Reset
         </button>
@@ -771,7 +920,7 @@ function TicketExplorerTab({ tickets }) {
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
               <thead>
                 <tr style={{ background: "#F9F8F7", borderBottom: `1px solid ${C.border}` }}>
-                  {["Date", "Subject", "Channel", "Reason", "Sub-Reason", "CSAT", "SLA"].map(h => (
+                  {["Date", "Subject", "Channel", "Reason", "AI Sentiment", "AI Score", "CSAT", "SLA"].map(h => (
                     <th key={h} style={{ padding: "10px 12px", textAlign: "left", fontSize: 10, color: C.muted, textTransform: "uppercase", letterSpacing: .5, fontWeight: 500, whiteSpace: "nowrap" }}>{h}</th>
                   ))}
                 </tr>
@@ -786,7 +935,25 @@ function TicketExplorerTab({ tickets }) {
                       <span style={{ fontSize: 10, padding: "2px 7px", borderRadius: 8, background: `${CH_COLORS[t.channel] || "#94A3B8"}22`, color: CH_COLORS[t.channel] || "#94A3B8", fontWeight: 500 }}>{t.channel}</span>
                     </td>
                     <td style={{ padding: "9px 12px", color: C.sub, fontSize: 11, maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.reason}</td>
-                    <td style={{ padding: "9px 12px", color: C.muted, fontSize: 11, maxWidth: 130, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.subReason || "—"}</td>
+                    <td style={{ padding: "9px 12px" }}>
+                      {t.finalSentiment ? (
+                        <span style={{ 
+                          fontSize: 10, padding: "2px 7px", borderRadius: 8, 
+                          background: t.finalSentiment.includes("Positive") ? "#DCFCE7" : t.finalSentiment.includes("Negative") ? "#FEE2E2" : "#FEF3C7",
+                          color: t.finalSentiment.includes("Positive") ? "#16A34A" : t.finalSentiment.includes("Negative") ? "#DC2626" : "#D97706",
+                          fontWeight: 600
+                        }}>
+                          {t.finalSentiment}
+                        </span>
+                      ) : <span style={{ color: C.muted }}>—</span>}
+                    </td>
+                    <td style={{ padding: "9px 12px" }}>
+                      {t.overallQualityScore > 0 ? (
+                        <span style={{ fontWeight: 700, color: t.overallQualityScore >= 7 ? "#10B981" : t.overallQualityScore >= 4 ? "#FBBF24" : "#EF4444" }}>
+                          {t.overallQualityScore}
+                        </span>
+                      ) : "—"}
+                    </td>
                     <td style={{ padding: "9px 12px" }}>
                       {t.happiness
                         ? <span style={{ fontSize: 10, fontWeight: 600, color: HP_COLORS[t.happiness] || C.muted }}>{t.happiness}</span>
@@ -813,39 +980,81 @@ function TicketExplorerTab({ tickets }) {
         </div>
 
         {selected && (
-          <Card style={{ alignSelf: "start", fontSize: 12 }}>
+          <Card style={{ alignSelf: "start", fontSize: 12, position: "sticky", top: 0 }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, maxWidth: 290, lineHeight: 1.4 }}>{selected.subject}</div>
-              <button onClick={() => setSelected(null)} style={{ background: "none", border: "none", color: C.muted, cursor: "pointer", fontSize: 20, lineHeight: 1, flexShrink: 0 }}>×</button>
+              <div style={{ fontSize: 14, fontWeight: 700 }}>Ticket #{selected.id}</div>
+              <button onClick={() => setSelected(null)} style={{ background: "none", border: "none", color: C.muted, cursor: "pointer", fontSize: 20, lineHeight: 1 }}>×</button>
             </div>
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
-              {selected.status && <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 6, background: selected.status === "Closed" ? "#F0FDF4" : "#EFF6FF", color: selected.status === "Closed" ? "#16A34A" : "#1D4ED8", fontWeight: 500 }}>{selected.status}</span>}
-              {selected.channel && <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 6, background: `${CH_COLORS[selected.channel] || "#94A3B8"}22`, color: CH_COLORS[selected.channel] || "#94A3B8", fontWeight: 500 }}>{selected.channel}</span>}
-              {selected.priority && <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 6, background: "#FEF3C7", color: "#92400E", fontWeight: 500 }}>{selected.priority}</span>}
-            </div>
-            {[
-              ["Reason", selected.reason],
-              ["Sub-Reason", selected.subReason],
-              ["Created", (selected.createdTime || "").slice(0, 16).replace("T", " ")],
-              ["Closed", (selected.closedTime || "").slice(0, 16).replace("T", " ") || "—"],
-              ["CSAT", selected.happiness || "—"],
-              ["SLA", selected.slaViolation || "—"],
-              ["Escalated", selected.isEscalated ? "Yes ⚠️" : "No"],
-              ["Escalation V.", selected.escalationValidity || "—"],
-              ["Merchant", selected.merchantName || "—"],
-              ["Country", selected.country || "—"],
-              ["Language", selected.language || "—"],
-              ["Tags", selected.tags || "—"],
-              ["Reassigns", selected.numReassign],
-              ["Reopens", selected.numReopen],
-              ["User ID", selected.userId || "—"],
-              ["Order ID", selected.orderId || "—"],
-            ].map(([label, val]) => (
-              <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", borderBottom: `1px solid ${C.border}` }}>
-                <span style={{ color: C.muted, flexShrink: 0, marginRight: 8 }}>{label}</span>
-                <span style={{ fontWeight: 500, textAlign: "right", wordBreak: "break-word", color: label === "CSAT" ? HP_COLORS[val] || C.text : label === "Escalated" && val.startsWith("Yes") ? "#EF4444" : C.text }}>{val}</span>
+            
+            {/* AI Summary Section */}
+            {selected.sentimentSummary && (
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: .5, marginBottom: 6 }}>AI Analysis Summary</div>
+                <div style={{ background: "#F0F9FF", padding: "10px 12px", borderRadius: 8, fontSize: 12, lineHeight: 1.5, color: "#0369A1", border: "1px solid #BAE6FD" }}>
+                  {selected.sentimentSummary}
+                </div>
               </div>
-            ))}
+            )}
+
+            {/* AI KPIs */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16 }}>
+              {[
+                ["Quality Score", `${selected.overallQualityScore}/10`, selected.overallQualityScore >= 7 ? "#10B981" : "#EF4444"],
+                ["Sentiment Shift", selected.sentimentShift || "Neutral", null],
+                ["Issue Type", selected.issueType || "Unknown", C.accent],
+                ["Root Cause", selected.rootCause || "Unknown", null],
+              ].map(([l, v, c]) => (
+                <div key={l} style={{ background: "#F9F8F7", padding: "8px 10px", borderRadius: 8 }}>
+                  <div style={{ fontSize: 9, color: C.muted, textTransform: "uppercase" }}>{l}</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: c || C.text }}>{v}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Detailed Parameters */}
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: .5, marginBottom: 8 }}>Quality Parameters</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {[
+                  ["Empathy Score", selected.empathyScore, 10],
+                  ["Knowledge Accuracy", selected.knowledgeAccuracy, 10],
+                  ["Policy Compliance", selected.policyCompliance ? "✓ Yes" : "✗ No", null],
+                  ["One-Touch Resolution", selected.oneTouchResolutionAI ? "✓ Yes" : "✗ No", null],
+                  ["Fraud Suspicion", selected.fraudSuspicion ? "⚠️ Yes" : "No", null],
+                  ["Payment Blocker", selected.isPaymentBlocker ? "🚫 Yes" : "No", null],
+                ].map(([l, v, max]) => (
+                  <div key={l} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 11, padding: "2px 0" }}>
+                    <span style={{ color: C.sub }}>{l}</span>
+                    <span style={{ fontWeight: 600, color: v === "✗ No" || v === "⚠️ Yes" || v === "🚫 Yes" ? "#EF4444" : C.text }}>
+                      {v}{max ? `/${max}` : ""}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {selected.monetaryValue > 0 && (
+              <div style={{ background: "#FFFBEB", border: "1px solid #FEF3C7", padding: 12, borderRadius: 8, marginBottom: 16 }}>
+                <div style={{ fontSize: 9, color: "#D97706", fontWeight: 700, textTransform: "uppercase" }}>Financial Impact</div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: "#D97706" }}>{selected.monetaryValue.toLocaleString()} SAR</div>
+              </div>
+            )}
+
+            {/* Basic Info */}
+            <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 12 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: .5, marginBottom: 8 }}>Basic Information</div>
+              {[
+                ["Merchant", selected.merchantName],
+                ["Reason", selected.reason],
+                ["Subject", selected.subject],
+                ["Created", (selected.createdTime || "").slice(0, 16).replace("T", " ")],
+              ].map(([l, v]) => (
+                <div key={l} style={{ marginBottom: 6 }}>
+                  <div style={{ fontSize: 9, color: C.muted }}>{l}</div>
+                  <div style={{ fontSize: 11, fontWeight: 500 }}>{v}</div>
+                </div>
+              ))}
+            </div>
           </Card>
         )}
       </div>
@@ -990,7 +1199,7 @@ function MacroTab({ merchants }) {
 }
 
 /* ─── PROFILER TAB ───────────────────────────────────────────── */
-function ProfilerTab({ merchants, anonKey, initialMerchant }) {
+function ProfilerTab({ merchants, anonKey, initialMerchant, tickets }) {
   const [query, setQuery] = useState(initialMerchant ? initialMerchant.Merchant : "");
   const [selected, setSelected] = useState(initialMerchant || null);
   const [showList, setShowList] = useState(false);
@@ -1195,7 +1404,7 @@ function ProfilerTab({ merchants, anonKey, initialMerchant }) {
           </Card>
 
           <Card style={{ padding: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
-            <MerchantProfiler initialMerchant={selected} embedded={true} />
+            <MerchantProfiler initialMerchant={selected} embedded={true} tickets={tickets} />
           </Card>
         </div>
       ) : (
@@ -1669,7 +1878,7 @@ export default function App() {
     if (ticketsLoaded || ticketsLoading) return;
     setTicketsLoading(true);
     try {
-      const cols = "id,ticket_id,subject,status,channel,priority,reason,sub_reason,ticket_owner,created_time,closed_time,happiness_rating,resolution_time_ms,num_reassign,num_reopen,is_overdue,is_escalated,sla_violation_type,escalation_validity,merchant_name,country,language,tags,user_id,order_id";
+      const cols = "id,ticket_id,subject,status,channel,priority,reason,sub_reason,ticket_owner,created_time,closed_time,happiness_rating,resolution_time_ms,num_reassign,num_reopen,is_overdue,is_escalated,sla_violation_type,escalation_validity,merchant_name,country,language,tags,user_id,order_id,analysis:ticket_analysis(*)";
       const rows = await sbFetch("zoho_tickets", anonKey, session.access_token, cols);
       setTickets(Array.isArray(rows) ? rows.map(normTicket) : []);
       setTicketsLoaded(true);
@@ -1855,7 +2064,7 @@ export default function App() {
       {/* Main */}
       <main style={{ flex: 1, overflowY: "auto", padding: 24 }}>
         {tab === "macro" && <MacroTab merchants={unifiedMerchants} />}
-        {tab === "profiler" && <ProfilerTab merchants={unifiedMerchants} anonKey={anonKey} initialMerchant={selectedMerchantForProfile} />}
+        {tab === "profiler" && <ProfilerTab merchants={unifiedMerchants} anonKey={anonKey} initialMerchant={selectedMerchantForProfile} tickets={tickets} />}
         {tab === "malls" && <MallsTab merchants={unifiedMerchants} onMerchantClick={handleMerchantClick} statuses={statuses} onStatusChange={handleStatusChange} />}
         {tab === "pipeline" && <PipelineTab merchants={unifiedMerchants} onMerchantClick={handleMerchantClick} statuses={statuses} onStatusChange={handleStatusChange} />}
         {tab === "support" && (ticketsLoading

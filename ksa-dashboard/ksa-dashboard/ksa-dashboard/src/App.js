@@ -851,15 +851,7 @@ function AgentsTab({ tickets }) {
 
 /* ─── TICKET EXPLORER TAB ────────────────────────────────────── */
 function TicketExplorerTab({ tickets }) {
-  const [channel, setChannel] = useState("All");
-  const [reason, setReason] = useState("All");
-  const [status, setStatus] = useState("All");
-  const [happiness, setHappiness] = useState("All");
-  const [slaF, setSlaF] = useState("All");
   const [aiFilter, setAiFilter] = useState("All");
-  const [q, setQ] = useState("");
-  const [page, setPage] = useState(1);
-  const [selected, setSelected] = useState(null);
   const PAGE = 50;
 
   const channels = useMemo(() => ["All", ...new Set(tickets.map(t => t.channel).filter(Boolean)).values()].sort(), [tickets]);

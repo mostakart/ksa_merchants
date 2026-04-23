@@ -1843,8 +1843,7 @@ function MallsTab({ merchants, onMerchantClick, statuses, onStatusChange }) {
 
 /* ─── MAIN APP ───────────────────────────────────────────────── */
 export default function App() {
-  console.log("Supabase URL:", process.env.REACT_APP_SUPABASE_URL);
-  const [anonKey, setAnonKey] = useState(process.env.REACT_APP_SUPABASE_KEY || null);
+  const [anonKey, setAnonKey] = useState("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9tb3dkZnp5dWRlZHJ0Y3VobnZ5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NjQzNjI3OCwiZXhwIjoyMDkyMDEyMjc4fQ.kgQTvZRIrgFXTwL5wDM5oYLmDS9GtRjltE53wcpDQes");
   const [session, setSession] = useState(null);
   const [merchants, setMerchants] = useState([]);
   const [loadingCity, setLoadingCity] = useState("");

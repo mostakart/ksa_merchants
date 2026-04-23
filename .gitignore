@@ -10,3 +10,5 @@ node_modules/
 build/
 .next/
 dist/
+.vercel
+.env*.local

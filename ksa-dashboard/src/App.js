@@ -300,20 +300,20 @@ function LoadingScreen({ city }) {
 }
 
 /* ─── TICKET HELPERS ─────────────────────────────────────────── */
-function normTicket(t) {
+function normTicket(a) {
+  const t = Array.isArray(a.ticket) ? a.ticket[0] : (a.ticket || {});
   const cleanHtml = s => (s || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
-  const a = Array.isArray(t.analysis) ? t.analysis[0] : (t.analysis || {});
   
   return {
-    id: t.id,
+    id: a.id,
     subject: cleanHtml(t.subject) || "—",
-    status: t.status || "",
+    status: t.status || a.ai_status || "Closed",
     channel: t.channel || "Other",
     priority: t.priority || "",
-    reason: t.reason || a.p_issue_type || "Unknown",
+    reason: a.p_issue_type || t.reason || "Unknown",
     subReason: t.sub_reason || "",
-    owner: t.ticket_owner || "",
-    createdTime: t.created_time || "",
+    owner: t.ticket_owner || t.assignee || "",
+    createdTime: t.created_time || t.ticket_time || a.analyzed_at || "",
     closedTime: t.closed_time || "",
     happiness: t.happiness_rating || "",
     resolutionMs: parseInt(t.resolution_time_ms) || 0,
@@ -323,7 +323,7 @@ function normTicket(t) {
     isEscalated: String(t.is_escalated) === "true",
     slaViolation: t.sla_violation_type || "",
     escalationValidity: t.escalation_validity || "",
-    merchantName: t.merchant_name || "",
+    merchantName: t.merchant_name || a.p_merchant_name || "",
     country: t.country || "",
     language: t.language || "",
     tags: t.tags || "",
@@ -1884,8 +1884,8 @@ export default function App() {
     if (ticketsLoaded || ticketsLoading) return;
     setTicketsLoading(true);
     try {
-      const cols = "id,ticket_id,subject,status,channel,priority,reason,sub_reason,ticket_owner,created_time,closed_time,happiness_rating,resolution_time_ms,num_reassign,num_reopen,is_overdue,is_escalated,sla_violation_type,escalation_validity,merchant_name,country,language,tags,user_id,order_id,analysis:ticket_analysis(*)";
-      const rows = await sbFetch("zoho_tickets", anonKey, session.access_token, cols);
+      const cols = "*,ticket:zoho_tickets(*)";
+      const rows = await sbFetch("ticket_analysis", anonKey, session.access_token, cols);
       setTickets(Array.isArray(rows) ? rows.map(normTicket) : []);
       setTicketsLoaded(true);
     } catch (e) {

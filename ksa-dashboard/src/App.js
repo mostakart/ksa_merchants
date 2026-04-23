@@ -310,7 +310,7 @@ function normTicket(t) {
     status: t.status || "",
     channel: t.channel || "Other",
     priority: t.priority || "",
-    reason: t.reason || "Unknown",
+    reason: t.reason || a.p_issue_type || "Unknown",
     subReason: t.sub_reason || "",
     owner: t.ticket_owner || "",
     createdTime: t.created_time || "",
@@ -360,11 +360,8 @@ function normTicket(t) {
 }
 
 function buildAgentMap(tickets) {
-  const counts = {};
-  tickets.forEach(t => { if (t.owner) counts[t.owner] = (counts[t.owner] || 0) + 1; });
-  const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
   const map = {};
-  sorted.forEach(([id], i) => { map[id] = `Agent ${String(i + 1).padStart(2, "0")}`; });
+  tickets.forEach(t => { if (t.owner) map[t.owner] = t.owner; });
   return map;
 }
 

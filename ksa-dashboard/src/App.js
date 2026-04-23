@@ -9,7 +9,7 @@ import {
 env.allowLocalModels = false;
 
 /* ─── CONFIG ─────────────────────────────────────────────────── */
-const SB_URL = "https://omowdfzyudedrtcuhnvy.supabase.co";
+const SB_URL = process.env.REACT_APP_SUPABASE_URL || "https://omowdfzyudedrtcuhnvy.supabase.co";
 const CITIES = ["riyadh", "jeddah", "dammam", "khobar", "mecca", "medina"];
 const C = {
   accent: "#FF5A00", accentL: "#FFF0ED", bg: "#F5F2EE",
@@ -1842,7 +1842,7 @@ function MallsTab({ merchants, onMerchantClick, statuses, onStatusChange }) {
 
 /* ─── MAIN APP ───────────────────────────────────────────────── */
 export default function App() {
-  const [anonKey, setAnonKey] = useState(null);
+  const [anonKey, setAnonKey] = useState(process.env.REACT_APP_SUPABASE_KEY || null);
   const [session, setSession] = useState(null);
   const [merchants, setMerchants] = useState([]);
   const [loadingCity, setLoadingCity] = useState("");

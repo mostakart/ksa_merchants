@@ -10,7 +10,7 @@ env.allowLocalModels = false;
 
 /* ─── CONFIG ─────────────────────────────────────────────────── */
 const SB_URL = process.env.REACT_APP_SUPABASE_URL || "https://omowdfzyudedrtcuhnvy.supabase.co";
-// Build trigger: Re-deploying to inject environment variables.
+// Build trigger: Final re-deploy with updated Supabase keys.
 const CITIES = ["riyadh", "jeddah", "dammam", "khobar", "mecca", "medina"];
 const C = {
   accent: "#FF5A00", accentL: "#FFF0ED", bg: "#F5F2EE",

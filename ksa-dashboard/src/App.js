@@ -682,6 +682,9 @@ function SupportTab({ tickets }) {
 /* ─── AGENT PERFORMANCE TAB ──────────────────────────────────── */
 function AgentsTab({ tickets, onAgentClick }) {
   const [sortBy, setSortBy] = useState("tickets");
+  const [page, setPage] = useState(1);
+  const pageSize = 12;
+
 
   const agentMap = useMemo(() => buildAgentMap(tickets), [tickets]);
 
@@ -718,13 +721,13 @@ function AgentsTab({ tickets, onAgentClick }) {
     }));
   }, [tickets, agentMap]);
 
-  const sorted = useMemo(() => [...agentStats].sort((a, b) => {
-    if (sortBy === "tickets") return b.tickets - a.tickets;
-    if (sortBy === "csat") return (b.csat ?? -1) - (a.csat ?? -1);
-    if (sortBy === "sla") return (b.slaRate ?? -1) - (a.slaRate ?? -1);
-    if (sortBy === "resolution") return parseFloat(a.avgRes ?? 9999) - parseFloat(b.avgRes ?? 9999);
     return 0;
   }), [agentStats, sortBy]);
+
+  const totalPages = Math.ceil(sorted.length / pageSize);
+  const paginated = sorted.slice((page - 1) * pageSize, page * pageSize);
+
+  useEffect(() => setPage(1), [sortBy]);
 
   return (
     <div>
@@ -763,7 +766,7 @@ function AgentsTab({ tickets, onAgentClick }) {
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(195px,1fr))", gap: 10, alignContent: "start" }}>
-        {sorted.map(agent => (
+        {paginated.map(agent => (
           <div key={agent.id} onClick={() => onAgentClick(agent.id)}
             style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 10, padding: 14, cursor: "pointer", transition: "all .12s" }}
             onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.boxShadow = "0 2px 12px rgba(255,90,0,.1)"; }}
@@ -797,6 +800,17 @@ function AgentsTab({ tickets, onAgentClick }) {
             <div style={{ marginTop: 6, fontSize: 10, color: C.accent, fontWeight: 500 }}>View full profile →</div>
           </div>
         ))}
+      </div>
+
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 24, fontSize: 12, color: C.muted, background: C.white, padding: "12px 16px", borderRadius: 10, border: `1px solid ${C.border}` }}>
+        <span>Showing <strong>{(page - 1) * pageSize + 1}–{Math.min(page * pageSize, sorted.length)}</strong> of {sorted.length} agents</span>
+        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+            style={{ padding: "5px 10px", border: `1px solid ${C.border}`, borderRadius: 6, fontSize: 11, background: page === 1 ? "#F9F9F9" : C.white, cursor: page === 1 ? "not-allowed" : "pointer", color: page === 1 ? C.muted : C.text }}>←</button>
+          <span style={{ padding: "0 10px" }}>Page {page} / {totalPages || 1}</span>
+          <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages}
+            style={{ padding: "5px 10px", border: `1px solid ${C.border}`, borderRadius: 6, fontSize: 11, background: page >= totalPages ? "#F9F9F9" : C.white, cursor: page >= totalPages ? "not-allowed" : "pointer", color: page >= totalPages ? C.muted : C.text }}>→</button>
+        </div>
       </div>
     </div>
   );
@@ -933,10 +947,19 @@ function TicketExplorerTab({ tickets, onTicketClick }) {
           </div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 12, fontSize: 11, color: C.muted }}>
             <span>Showing {filtered.length === 0 ? 0 : (page - 1) * PAGE + 1}–{Math.min(page * PAGE, filtered.length)} of {filtered.length.toLocaleString()}</span>
-            <div style={{ display: "flex", gap: 6 }}>
+            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
               <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
                 style={{ padding: "5px 10px", border: `1px solid ${C.border}`, borderRadius: 6, fontSize: 11, background: page === 1 ? "#F4F2EE" : C.white, cursor: page === 1 ? "not-allowed" : "pointer", color: page === 1 ? C.muted : C.text }}>←</button>
-              <span style={{ padding: "5px 10px" }}>Page {page} / {totalPages || 1}</span>
+              <div style={{ display: "flex", gap: 4 }}>
+                {[...Array(totalPages)].map((_, i) => {
+                  const p = i + 1;
+                  if (totalPages > 5 && Math.abs(p - page) > 1 && p !== 1 && p !== totalPages) return p === 2 || p === totalPages - 1 ? <span key={p}>...</span> : null;
+                  return (
+                    <button key={p} onClick={() => setPage(p)}
+                      style={{ width: 26, height: 26, border: `1px solid ${page === p ? C.accent : C.border}`, borderRadius: 6, fontSize: 11, background: page === p ? C.accent : C.white, color: page === p ? "#fff" : C.text, cursor: "pointer", fontWeight: 600 }}>{p}</button>
+                  );
+                })}
+              </div>
               <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages}
                 style={{ padding: "5px 10px", border: `1px solid ${C.border}`, borderRadius: 6, fontSize: 11, background: page >= totalPages ? "#F4F2EE" : C.white, cursor: page >= totalPages ? "not-allowed" : "pointer", color: page >= totalPages ? C.muted : C.text }}>→</button>
             </div>
@@ -1356,7 +1379,7 @@ function PipelineTab({ merchants, onMerchantClick, statuses, onStatusChange }) {
   const [price, setPrice] = useState("All");
   const [hours, setHours] = useState("All");
   const [page, setPage] = useState(1);
-  const pageSize = 100;
+  const pageSize = 50;
 
   const allCities = useMemo(() => ["All", ...new Set(merchants.map(m => m.City).filter(Boolean))].sort(), [merchants]);
   const allMalls = useMemo(() => {
@@ -1502,18 +1525,23 @@ function PipelineTab({ merchants, onMerchantClick, statuses, onStatusChange }) {
         </div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", background: "#F9F8F7", borderTop: `1px solid ${C.border}` }}>
           <div style={{ fontSize: 11, color: C.muted }}>
-            Showing {filteredMerchants.length === 0 ? 0 : ((page - 1) * pageSize) + 1} to {Math.min(page * pageSize, filteredMerchants.length)} of {filteredMerchants.length} entries
+            Showing <strong>{filteredMerchants.length === 0 ? 0 : ((page - 1) * pageSize) + 1} to {Math.min(page * pageSize, filteredMerchants.length)}</strong> of {filteredMerchants.length} entries
           </div>
-          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
-              style={{ padding: "6px 12px", background: page === 1 ? "#F4F2EE" : C.white, border: `1px solid ${C.border}`, borderRadius: 6, fontSize: 11, color: page === 1 ? C.muted : C.text, cursor: page === 1 ? "not-allowed" : "pointer" }}>
-              Previous
-            </button>
-            <div style={{ padding: "0 10px", fontSize: 11, fontWeight: 500 }}>Page {page} of {totalPages || 1}</div>
+              style={{ padding: "6px 12px", border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 11, background: page === 1 ? "#F9F9F9" : C.white, cursor: page === 1 ? "not-allowed" : "pointer", color: page === 1 ? C.muted : C.text, fontWeight: 600 }}>← Previous</button>
+            <div style={{ display: "flex", gap: 4 }}>
+              {[...Array(totalPages)].map((_, i) => {
+                const p = i + 1;
+                if (totalPages > 5 && Math.abs(p - page) > 1 && p !== 1 && p !== totalPages) return p === 2 || p === totalPages - 1 ? <span key={p} style={{ fontSize: 10, color: C.muted }}>...</span> : null;
+                return (
+                  <button key={p} onClick={() => setPage(p)}
+                    style={{ width: 28, height: 28, border: `1px solid ${page === p ? C.accent : C.border}`, borderRadius: 6, fontSize: 11, background: page === p ? C.accent : C.white, color: page === p ? "#fff" : C.text, cursor: "pointer", fontWeight: 600 }}>{p}</button>
+                );
+              })}
+            </div>
             <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages || totalPages === 0}
-              style={{ padding: "6px 12px", background: page >= totalPages ? "#F4F2EE" : C.white, border: `1px solid ${C.border}`, borderRadius: 6, fontSize: 11, color: page >= totalPages ? C.muted : C.text, cursor: page >= totalPages ? "not-allowed" : "pointer" }}>
-              Next
-            </button>
+              style={{ padding: "6px 12px", border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 11, background: page >= totalPages ? "#F9F9F9" : C.white, cursor: page >= totalPages ? "not-allowed" : "pointer", color: page >= totalPages ? C.muted : C.text, fontWeight: 600 }}>Next →</button>
           </div>
         </div>
       </div>
@@ -1527,6 +1555,8 @@ function MallsTab({ merchants, onMerchantClick, statuses, onStatusChange }) {
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState("merchants");
   const [selectedMall, setSelectedMall] = useState(null);
+  const [page, setPage] = useState(1);
+  const pageSize = 12;
 
   const mallsData = useMemo(() => {
     const map = {};
@@ -1549,16 +1579,13 @@ function MallsTab({ merchants, onMerchantClick, statuses, onStatusChange }) {
 
   const allCities = useMemo(() => ["All", ...new Set(mallsData.map(m => m.city).filter(Boolean)).values()].sort(), [mallsData]);
 
-  const filtered = useMemo(() => {
-    let list = mallsData;
-    if (cityFilter !== "All") list = list.filter(m => m.city === cityFilter);
-    if (search.trim()) list = list.filter(m => m.name.toLowerCase().includes(search.toLowerCase()));
-    return [...list].sort((a, b) => {
-      if (sortBy === "rating") return b.avgRating - a.avgRating;
-      if (sortBy === "reviews") return b.reviewsTotal - a.reviewsTotal;
-      return b.merchants - a.merchants;
     });
   }, [mallsData, cityFilter, search, sortBy]);
+
+  const totalPages = Math.ceil(filtered.length / pageSize);
+  const paginated = filtered.slice((page - 1) * pageSize, page * pageSize);
+
+  useEffect(() => setPage(1), [cityFilter, search, sortBy]);
 
   if (selectedMall) {
     const mallMerchants = merchants.filter(m => m.Mall === selectedMall.name);
@@ -1666,7 +1693,7 @@ function MallsTab({ merchants, onMerchantClick, statuses, onStatusChange }) {
         <span style={{ marginLeft: "auto", fontSize: 12, color: C.muted, fontWeight: 500 }}>{filtered.length} malls</span>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 14 }}>
-        {filtered.map((mall, i) => (
+        {paginated.map((mall, i) => (
           <div key={i} onClick={() => setSelectedMall(mall)}
             style={{ background: C.white, borderRadius: 12, border: `1px solid ${C.border}`, padding: 20, cursor: "pointer", transition: "all .18s", boxShadow: "0 1px 3px rgba(0,0,0,.05)" }}
             onMouseEnter={e => { e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,.1)"; e.currentTarget.style.borderColor = C.accent; }}
@@ -1698,6 +1725,26 @@ function MallsTab({ merchants, onMerchantClick, statuses, onStatusChange }) {
             </div>
           </div>
         ))}
+      </div>
+
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 24, fontSize: 13, color: C.muted, background: C.white, padding: "12px 20px", borderRadius: 12, border: `1px solid ${C.border}` }}>
+        <span>Showing <strong style={{ color: C.text }}>{filtered.length === 0 ? 0 : (page - 1) * pageSize + 1}–{Math.min(page * pageSize, filtered.length)}</strong> of {filtered.length} malls</span>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+            style={{ padding: "6px 12px", border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 13, background: page === 1 ? "#F9F9F9" : C.white, cursor: page === 1 ? "not-allowed" : "pointer", color: page === 1 ? C.muted : C.text, fontWeight: 600 }}>← Previous</button>
+          <div style={{ display: "flex", gap: 4 }}>
+            {[...Array(totalPages)].map((_, i) => {
+              const p = i + 1;
+              if (totalPages > 7 && Math.abs(p - page) > 2 && p !== 1 && p !== totalPages) return p === 2 || p === totalPages - 1 ? <span key={p}>...</span> : null;
+              return (
+                <button key={p} onClick={() => setPage(p)}
+                  style={{ width: 32, height: 32, border: `1px solid ${page === p ? C.accent : C.border}`, borderRadius: 8, fontSize: 13, background: page === p ? C.accent : C.white, color: page === p ? "#fff" : C.text, cursor: "pointer", fontWeight: 600 }}>{p}</button>
+              );
+            })}
+          </div>
+          <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages}
+            style={{ padding: "6px 12px", border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 13, background: page >= totalPages ? "#F9F9F9" : C.white, cursor: page >= totalPages ? "not-allowed" : "pointer", color: page >= totalPages ? C.muted : C.text, fontWeight: 600 }}>Next →</button>
+        </div>
       </div>
     </div>
   );
@@ -1763,15 +1810,17 @@ function ChatBubble({ msg }) {
 function ChatReview({ tickets, initialTicketId }) {
   const [selectedId, setSelectedId] = useState(initialTicketId || null);
   const [searchQ, setSearchQ] = useState("");
+  const [page, setPage] = useState(1);
+  const pageSize = 50;
   const threadRef = useRef(null);
 
-  const filteredList = useMemo(() => {
-    const q = searchQ.toLowerCase();
-    return tickets.filter(t =>
-      !q || String(t.id).includes(q) || t.subject.toLowerCase().includes(q) ||
-      t.owner.toLowerCase().includes(q) || t.reason.toLowerCase().includes(q)
     ).sort((a, b) => b.createdTime.localeCompare(a.createdTime));
   }, [tickets, searchQ]);
+
+  const totalPages = Math.ceil(filteredList.length / pageSize);
+  const paginatedList = useMemo(() => filteredList.slice((page - 1) * pageSize, page * pageSize), [filteredList, page]);
+
+  useEffect(() => setPage(1), [searchQ]);
 
   const selected = useMemo(() => tickets.find(t => t.id === selectedId) || null, [tickets, selectedId]);
   const messages = useMemo(() => selected ? parseMessages(selected.subject, selected.owner) : null, [selected]);
@@ -1796,8 +1845,8 @@ function ChatReview({ tickets, initialTicketId }) {
             </svg>
           </div>
         </div>
-        <div style={{ flex: 1, overflowY: "auto" }}>
-          {filteredList.map(t => (
+        <div style={{ flex: 1, overflowY: "auto", position: "relative" }}>
+          {paginatedList.map(t => (
             <div key={t.id} onClick={() => setSelectedId(t.id)}
               style={{ padding: "12px 16px", cursor: "pointer", borderBottom: `1px solid #F4F2EE`, background: selectedId === t.id ? C.accentL : "transparent", borderLeft: selectedId === t.id ? `3px solid ${C.accent}` : "3px solid transparent", transition: "all .1s" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 }}>
@@ -1815,6 +1864,18 @@ function ChatReview({ tickets, initialTicketId }) {
           {filteredList.length === 0 && (
             <div style={{ textAlign: "center", padding: 40, color: C.muted, fontSize: 12 }}>No tickets found</div>
           )}
+        </div>
+        
+        {/* Sidebar Pagination */}
+        {totalPages > 1 && (
+          <div style={{ padding: "10px 12px", borderTop: `1px solid ${C.border}`, background: "#F9F8F7", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+              style={{ padding: "4px 8px", background: page === 1 ? "transparent" : C.white, border: `1px solid ${C.border}`, borderRadius: 4, fontSize: 10, cursor: page === 1 ? "not-allowed" : "pointer", color: C.muted }}>←</button>
+            <span style={{ fontSize: 10, color: C.muted, fontWeight: 600 }}>Page {page} / {totalPages}</span>
+            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages}
+              style={{ padding: "4px 8px", background: page >= totalPages ? "transparent" : C.white, border: `1px solid ${C.border}`, borderRadius: 4, fontSize: 10, cursor: page >= totalPages ? "not-allowed" : "pointer", color: C.muted }}>→</button>
+          </div>
+        )}
         </div>
       </div>
 

@@ -10,7 +10,6 @@ env.allowLocalModels = false;
 
 /* ─── CONFIG ─────────────────────────────────────────────────── */
 const SB_URL = process.env.REACT_APP_SUPABASE_URL || "https://omowdfzyudedrtcuhnvy.supabase.co";
-// Build trigger: Final re-deploy with updated Supabase keys.
 const CITIES = ["riyadh", "jeddah", "dammam", "khobar", "mecca", "medina"];
 const C = {
   accent: "#FF5A00", accentL: "#FFF0ED", bg: "#F5F2EE",
@@ -18,7 +17,11 @@ const C = {
   muted: "#9B9792", sub: "#6B6B6B",
 };
 
-// --- Branding ---
+/* ─── MERCHANT CACHE ─────────────────────────────────────────── */
+const merchantCache = new Map();
+const CACHE_TTL = 30 * 60 * 1000;
+
+/* ─── BRANDING ───────────────────────────────────────────────── */
 const WaffarhaIcon = ({ size = 120, style }) => (
   <img src="https://i.ibb.co/j9kcTcrK/Waffarha-logo.png" alt="Waffarha Icon" style={{ width: size, height: "auto", objectFit: "contain", display: "block", ...style }} />
 );
@@ -66,6 +69,17 @@ async function sbLogin(key, email, password) {
   return d;
 }
 
+/* ─── AUDIT LOG ──────────────────────────────────────────────── */
+async function logAudit(anonKey, token, userId, action, resource, meta = {}) {
+  try {
+    await fetch(`${SB_URL}/rest/v1/nexus_audit_log`, {
+      method: "POST",
+      headers: { ...sbH(anonKey, token), Prefer: "return=minimal" },
+      body: JSON.stringify({ user_id: userId, action, resource, metadata: meta, created_at: new Date().toISOString() }),
+    });
+  } catch (e) { /* silent fail */ }
+}
+
 /* ─── NORMALIZATION ──────────────────────────────────────────── */
 const normArabic = s => (s || "").toLowerCase().replace(/[أإآا]/g, 'ا').replace(/[ةه]/g, 'ه').replace(/[ىي]/g, 'ي').replace(/\s+/g, '');
 const editDist = (s1, s2) => {
@@ -85,12 +99,10 @@ const editDist = (s1, s2) => {
 const norm = m => {
   const pRaw = m.priority ? String(m.priority).replace(/🔴|🟡|🟢/g, "").trim() : "";
   const prio = !pRaw || pRaw.toLowerCase() === "none" || pRaw.toLowerCase() === "null" || pRaw.toLowerCase() === "nan" ? "Uncategorized" : pRaw;
-
   const hRaw = String(m.opening_hours || "").trim();
   let hCat = "Not Available";
   if (hRaw.toLowerCase().includes("24 hours") || hRaw.toLowerCase().includes("24/7") || hRaw.includes("٢٤ ساعة")) hCat = "24 Hours";
   else if (hRaw.length > 2 && hRaw.toLowerCase() !== "none" && hRaw.toLowerCase() !== "null") hCat = "Specified Hours";
-
   return {
     Merchant: m.merchant_name || "",
     Mall: m.mall || "",
@@ -126,10 +138,7 @@ function computeCityStats(merchants) {
   });
   const r = {};
   for (const [city, d] of Object.entries(s)) {
-    r[city] = {
-      total: d.total, high: d.high, medium: d.medium, low: d.low,
-      avgRating: d.rN ? +(d.rSum / d.rN).toFixed(2) : 0, malls: d.malls.size
-    };
+    r[city] = { total: d.total, high: d.high, medium: d.medium, low: d.low, avgRating: d.rN ? +(d.rSum / d.rN).toFixed(2) : 0, malls: d.malls.size };
   }
   return r;
 }
@@ -202,12 +211,10 @@ function SetupScreen({ onSetup }) {
           <div style={{ fontSize: 20, fontWeight: 700 }}>Database Setup</div>
           <div style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>Waffarha KSA Market</div>
         </div>
-
         <div style={{ background: "#F9F8F7", borderRadius: 8, padding: "10px 14px", marginBottom: 18, fontSize: 12 }}>
           <div style={{ color: C.muted, fontSize: 10, textTransform: "uppercase", letterSpacing: .5, marginBottom: 4 }}>Supabase Project</div>
           <code style={{ fontSize: 11, color: C.sub }}>{SB_URL}</code>
         </div>
-
         <label style={{ display: "block", fontSize: 11, fontWeight: 500, color: C.sub, marginBottom: 6, textTransform: "uppercase", letterSpacing: .5 }}>
           Anon Key (public)
         </label>
@@ -218,9 +225,7 @@ function SetupScreen({ onSetup }) {
         <div style={{ fontSize: 11, color: C.muted, marginBottom: 18 }}>
           📍 Supabase → Settings → API → <strong>anon public</strong>
         </div>
-
         {err && <div style={{ color: C.accent, fontSize: 12, padding: "8px 10px", background: C.accentL, borderRadius: 6, marginBottom: 12 }}>{err}</div>}
-
         <button onClick={() => { if (!key.trim()) return setErr("Anon key required"); onSetup(key.trim()); }}
           style={{ width: "100%", padding: 13, background: C.accent, color: "#fff", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
           Connect to Supabase →
@@ -232,8 +237,9 @@ function SetupScreen({ onSetup }) {
 
 /* ─── LOGIN SCREEN ───────────────────────────────────────────── */
 function LoginScreen({ anonKey, onLogin }) {
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(localStorage.getItem("wn_email") || "");
   const [password, setPassword] = useState("");
+  const [rememberEmail, setRememberEmail] = useState(!!localStorage.getItem("wn_email"));
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
 
@@ -242,6 +248,8 @@ function LoginScreen({ anonKey, onLogin }) {
     setLoading(true); setErr("");
     try {
       const session = await sbLogin(anonKey, email, password);
+      if (rememberEmail) localStorage.setItem("wn_email", email);
+      else localStorage.removeItem("wn_email");
       onLogin(session);
     } catch (e) { setErr(e.message); }
     setLoading(false);
@@ -255,24 +263,27 @@ function LoginScreen({ anonKey, onLogin }) {
           <div style={{ fontSize: 20, fontWeight: 700 }}>Sign In</div>
           <div style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>Waffarha BD Team</div>
         </div>
-
-        {[["Email", "email", email, setEmail, "bd@waffarha.com"], ["Password", "password", password, setPassword, "••••••••"]].map(([l, t, v, fn, ph]) => (
-          <div key={l} style={{ marginBottom: 14 }}>
-            <label style={{ display: "block", fontSize: 11, fontWeight: 500, color: C.sub, marginBottom: 6, textTransform: "uppercase", letterSpacing: .5 }}>{l}</label>
-            <input type={t} value={v} onChange={e => fn(e.target.value)} placeholder={ph}
-              onKeyDown={e => e.key === "Enter" && handleLogin()}
-              style={{ width: "100%", padding: "10px 12px", border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 13, outline: "none", color: C.text, boxSizing: "border-box" }}
-            />
-          </div>
-        ))}
-
+        <div style={{ marginBottom: 14 }}>
+          <label style={{ display: "block", fontSize: 11, fontWeight: 500, color: C.sub, marginBottom: 6, textTransform: "uppercase", letterSpacing: .5 }}>Email</label>
+          <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="bd@waffarha.com"
+            onKeyDown={e => e.key === "Enter" && handleLogin()}
+            style={{ width: "100%", padding: "10px 12px", border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 13, outline: "none", color: C.text, boxSizing: "border-box" }} />
+        </div>
+        <div style={{ marginBottom: 14 }}>
+          <label style={{ display: "block", fontSize: 11, fontWeight: 500, color: C.sub, marginBottom: 6, textTransform: "uppercase", letterSpacing: .5 }}>Password</label>
+          <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••"
+            onKeyDown={e => e.key === "Enter" && handleLogin()}
+            style={{ width: "100%", padding: "10px 12px", border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 13, outline: "none", color: C.text, boxSizing: "border-box" }} />
+        </div>
+        <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12, color: C.sub, marginBottom: 14, cursor: "pointer" }}>
+          <input type="checkbox" checked={rememberEmail} onChange={e => setRememberEmail(e.target.checked)} />
+          Remember my email
+        </label>
         {err && <div style={{ color: C.accent, fontSize: 12, padding: "8px 10px", background: C.accentL, borderRadius: 6, marginBottom: 12 }}>{err}</div>}
-
         <button onClick={handleLogin} disabled={loading}
           style={{ width: "100%", padding: 12, background: loading ? C.border : C.accent, color: loading ? C.muted : "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: loading ? "not-allowed" : "pointer" }}>
           {loading ? "Signing in…" : "Sign In →"}
         </button>
-
         <div style={{ marginTop: 16, padding: "12px 14px", background: "#F0FDF4", borderRadius: 8, fontSize: 11, color: "#15803D", lineHeight: 1.8 }}>
           <strong>Create users manually:</strong><br />
           Supabase → Authentication → Users → Add user
@@ -303,7 +314,6 @@ function LoadingScreen({ city }) {
 function normTicket(a) {
   const t = Array.isArray(a.ticket) ? a.ticket[0] : (a.ticket || {});
   const cleanHtml = s => (s || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
-  
   return {
     id: a.id,
     subject: cleanHtml(t.subject) || "—",
@@ -329,8 +339,6 @@ function normTicket(a) {
     tags: t.tags || "",
     userId: t.user_id || "",
     orderId: t.order_id || "",
-
-    // --- AI Analysis Fields ---
     issueType: a.p_issue_type || "",
     merchantIssue: a.p_merchant_issue_type || "",
     isPaymentBlocker: String(a.p_payment_blocker).toLowerCase() === "true",
@@ -417,8 +425,7 @@ function SupportTab({ tickets }) {
   const rootCauseData = useMemo(() => {
     const counts = {};
     analyzed.forEach(t => { if (t.rootCause) counts[t.rootCause] = (counts[t.rootCause] || 0) + 1; });
-    return Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 5)
-      .map(([name, value]) => ({ name, value }));
+    return Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([name, value]) => ({ name, value }));
   }, [analyzed]);
 
   const sentimentData = useMemo(() => {
@@ -429,8 +436,8 @@ function SupportTab({ tickets }) {
       else if (s.includes("Negative")) counts.Negative++;
       else counts.Neutral++;
     });
-    return Object.entries(counts).map(([name, value]) => ({ 
-      name, value, color: name === "Positive" ? "#10B981" : name === "Negative" ? "#EF4444" : "#FBBF24" 
+    return Object.entries(counts).map(([name, value]) => ({
+      name, value, color: name === "Positive" ? "#10B981" : name === "Negative" ? "#EF4444" : "#FBBF24"
     })).filter(d => d.value > 0);
   }, [analyzed]);
 
@@ -451,22 +458,16 @@ function SupportTab({ tickets }) {
     const counts = {};
     tickets.forEach(t => {
       if (!t.country) return;
-      const norm = t.country.trim().toUpperCase() === "EGYPT" || t.country.trim() === "Egypt" ? "Egypt" : t.country.trim();
-      counts[norm] = (counts[norm] || 0) + 1;
+      const n = t.country.trim().toUpperCase() === "EGYPT" || t.country.trim() === "Egypt" ? "Egypt" : t.country.trim();
+      counts[n] = (counts[n] || 0) + 1;
     });
-    return Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 6)
-      .map(([name, value]) => ({ name, value }));
+    return Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([name, value]) => ({ name, value }));
   }, [tickets]);
 
   const monetaryData = useMemo(() => {
     const sums = {};
-    analyzed.forEach(t => {
-      if (t.issueType && t.monetaryValue > 0) {
-        sums[t.issueType] = (sums[t.issueType] || 0) + t.monetaryValue;
-      }
-    });
-    return Object.entries(sums).sort((a, b) => b[1] - a[1]).slice(0, 5)
-      .map(([name, value]) => ({ name, value }));
+    analyzed.forEach(t => { if (t.issueType && t.monetaryValue > 0) sums[t.issueType] = (sums[t.issueType] || 0) + t.monetaryValue; });
+    return Object.entries(sums).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([name, value]) => ({ name, value }));
   }, [analyzed]);
 
   return (
@@ -490,7 +491,6 @@ function SupportTab({ tickets }) {
         <KPI label="Escalated" value={escalated.toLocaleString()} sub={`${total ? Math.round(escalated / total * 100) : 0}% rate`} color={escalated > 100 ? "#EF4444" : C.text} />
       </div>
 
-      {/* AI Quality Grid */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 20 }}>
         <KPI label="AI Quality Score" value={`${avgQuality}/10`} sub="Agent performance" color={parseFloat(avgQuality) >= 7 ? "#10B981" : "#FBBF24"} />
         <KPI label="Empathy Score" value={`${avgEmpathy}/10`} sub="Customer care" color={parseFloat(avgEmpathy) >= 7 ? "#10B981" : "#FBBF24"} />
@@ -510,7 +510,6 @@ function SupportTab({ tickets }) {
             </BarChart>
           </ResponsiveContainer>
         </Card>
-
         <Card>
           <ChartTitle>AI Final Sentiment</ChartTitle>
           <div style={{ display: "flex", alignItems: "center", height: 180 }}>
@@ -531,7 +530,6 @@ function SupportTab({ tickets }) {
             </div>
           </div>
         </Card>
-
         <Card>
           <ChartTitle>Monthly AI Resolution Score</ChartTitle>
           <div style={{ textAlign: "center", padding: "20px 0" }}>
@@ -544,7 +542,6 @@ function SupportTab({ tickets }) {
         </Card>
       </div>
 
-      {/* Monthly Volume */}
       <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 16, marginBottom: 16 }}>
         <Card>
           <ChartTitle>Monthly Ticket Volume — Stacked by Channel</ChartTitle>
@@ -568,7 +565,6 @@ function SupportTab({ tickets }) {
             ))}
           </div>
         </Card>
-
         <Card>
           <ChartTitle>Channel Breakdown</ChartTitle>
           <ResponsiveContainer width="100%" height={160}>
@@ -593,7 +589,6 @@ function SupportTab({ tickets }) {
         </Card>
       </div>
 
-      {/* Reason + CSAT + Country */}
       <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gap: 16 }}>
         <Card>
           <ChartTitle>Top 10 Ticket Reasons</ChartTitle>
@@ -607,7 +602,6 @@ function SupportTab({ tickets }) {
             </BarChart>
           </ResponsiveContainer>
         </Card>
-
         <Card>
           <ChartTitle>CSAT — Happiness Rating</ChartTitle>
           <ResponsiveContainer width="100%" height={140}>
@@ -631,7 +625,6 @@ function SupportTab({ tickets }) {
             ))}
           </div>
         </Card>
-
         <Card>
           <ChartTitle>Top Countries</ChartTitle>
           {countryData.map((d, i) => (
@@ -652,7 +645,6 @@ function SupportTab({ tickets }) {
         </Card>
       </div>
 
-      {/* Financial Impact Section */}
       {monetaryData.length > 0 && (
         <div style={{ marginTop: 16 }}>
           <Card>
@@ -679,9 +671,8 @@ function SupportTab({ tickets }) {
 }
 
 /* ─── AGENT PERFORMANCE TAB ──────────────────────────────────── */
-function AgentsTab({ tickets }) {
+function AgentsTab({ tickets, onAgentClick }) {
   const [sortBy, setSortBy] = useState("tickets");
-  const [selectedAgentId, setSelectedAgentId] = useState(null);
 
   const agentMap = useMemo(() => buildAgentMap(tickets), [tickets]);
 
@@ -726,8 +717,6 @@ function AgentsTab({ tickets }) {
     return 0;
   }), [agentStats, sortBy]);
 
-  const sel = selectedAgentId ? agentStats.find(a => a.id === selectedAgentId) : null;
-
   return (
     <div>
       <div style={{ marginBottom: 20 }}>
@@ -735,7 +724,6 @@ function AgentsTab({ tickets }) {
         <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>{agentStats.length} agents · {tickets.length.toLocaleString()} tickets</div>
       </div>
 
-      {/* Team KPIs */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 12, marginBottom: 20 }}>
         {(() => {
           const totalRated = agentStats.reduce((s, a) => s + a.rated, 0);
@@ -765,89 +753,48 @@ function AgentsTab({ tickets }) {
         ))}
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: sel ? "1fr 300px" : "1fr", gap: 16 }}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(195px,1fr))", gap: 10, alignContent: "start" }}>
-          {sorted.map(agent => (
-            <div key={agent.id} onClick={() => setSelectedAgentId(selectedAgentId === agent.id ? null : agent.id)}
-              style={{ background: C.white, border: `1px solid ${selectedAgentId === agent.id ? C.accent : C.border}`, borderRadius: 10, padding: 14, cursor: "pointer", transition: "all .12s" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 600 }}>{agent.name}</div>
-                  <div style={{ fontSize: 10, color: C.muted }}>{agent.tickets.toLocaleString()} tickets</div>
-                </div>
-                {agent.csat !== null && (
-                  <span style={{
-                    fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 6,
-                    background: agent.csat >= 70 ? "#DCFCE7" : agent.csat >= 50 ? "#FEF3C7" : "#FEE2E2",
-                    color: agent.csat >= 70 ? "#16A34A" : agent.csat >= 50 ? "#D97706" : "#DC2626"
-                  }}>
-                    {agent.csat}%
-                  </span>
-                )}
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 5 }}>
-                {[["SLA", agent.slaRate !== null ? `${agent.slaRate}%` : "—"], ["Avg Res.", agent.avgRes ? `${agent.avgRes}h` : "—"], ["Escalated", agent.escalated], ["Reassigned", agent.reassigns]].map(([l, v]) => (
-                  <div key={l} style={{ background: "#F9F8F7", borderRadius: 6, padding: "5px 7px" }}>
-                    <div style={{ fontSize: 9, color: C.muted, textTransform: "uppercase" }}>{l}</div>
-                    <div style={{ fontSize: 12, fontWeight: 600 }}>{v}</div>
-                  </div>
-                ))}
-              </div>
-              <div style={{ marginTop: 8, fontSize: 10, color: C.muted }}>
-                Top reason: <span style={{ color: C.text }}>{agent.topReason.length > 20 ? agent.topReason.slice(0, 20) + "…" : agent.topReason}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {sel && (
-          <Card style={{ alignSelf: "start", fontSize: 12 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 14 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(195px,1fr))", gap: 10, alignContent: "start" }}>
+        {sorted.map(agent => (
+          <div key={agent.id} onClick={() => onAgentClick(agent.id)}
+            style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 10, padding: 14, cursor: "pointer", transition: "all .12s" }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.boxShadow = "0 2px 12px rgba(255,90,0,.1)"; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.boxShadow = "none"; }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
               <div>
-                <div style={{ fontSize: 15, fontWeight: 700 }}>{sel.name}</div>
-                <div style={{ fontSize: 10, color: C.muted }}>{sel.tickets.toLocaleString()} tickets · main: {sel.topChannel}</div>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>{agent.name}</div>
+                <div style={{ fontSize: 10, color: C.muted }}>{agent.tickets.toLocaleString()} tickets</div>
               </div>
-              <button onClick={() => setSelectedAgentId(null)} style={{ background: "none", border: "none", color: C.muted, cursor: "pointer", fontSize: 20, lineHeight: 1 }}>×</button>
+              {agent.csat !== null && (
+                <span style={{
+                  fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 6,
+                  background: agent.csat >= 70 ? "#DCFCE7" : agent.csat >= 50 ? "#FEF3C7" : "#FEE2E2",
+                  color: agent.csat >= 70 ? "#16A34A" : agent.csat >= 50 ? "#D97706" : "#DC2626"
+                }}>
+                  {agent.csat}%
+                </span>
+              )}
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 14 }}>
-              {[
-                ["CSAT", sel.csat !== null ? `${sel.csat}%` : "N/A", sel.csat !== null && sel.csat >= 70 ? "#10B981" : "#EF4444"],
-                ["SLA Rate", sel.slaRate !== null ? `${sel.slaRate}%` : "N/A", sel.slaRate !== null && sel.slaRate >= 90 ? "#10B981" : "#FBBF24"],
-                ["Avg Res.", sel.avgRes ? `${sel.avgRes}h` : "N/A", null],
-                ["Escalated", sel.escalated, sel.escalated > 10 ? "#EF4444" : null],
-                ["Reassignments", sel.reassigns, null],
-                ["Rated Tickets", sel.rated, null],
-              ].map(([label, val, color]) => (
-                <div key={label} style={{ background: "#F9F8F7", borderRadius: 7, padding: "8px 10px" }}>
-                  <div style={{ fontSize: 9, color: C.muted, textTransform: "uppercase", marginBottom: 2 }}>{label}</div>
-                  <div style={{ fontSize: 16, fontWeight: 700, color: color || C.text }}>{val}</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 5 }}>
+              {[["SLA", agent.slaRate !== null ? `${agent.slaRate}%` : "—"], ["Avg Res.", agent.avgRes ? `${agent.avgRes}h` : "—"], ["Escalated", agent.escalated], ["Reassigned", agent.reassigns]].map(([l, v]) => (
+                <div key={l} style={{ background: "#F9F8F7", borderRadius: 6, padding: "5px 7px" }}>
+                  <div style={{ fontSize: 9, color: C.muted, textTransform: "uppercase" }}>{l}</div>
+                  <div style={{ fontSize: 12, fontWeight: 600 }}>{v}</div>
                 </div>
               ))}
             </div>
-            <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
-              {[["Good", sel.good, "#10B981"], ["Okay", sel.okay, "#FBBF24"], ["Bad", sel.bad, "#EF4444"]].map(([label, val, color]) => (
-                <div key={label} style={{ flex: 1, textAlign: "center", padding: "8px 4px", background: "#F9F8F7", borderRadius: 7 }}>
-                  <div style={{ fontSize: 18, fontWeight: 700, color }}>{val}</div>
-                  <div style={{ fontSize: 10, color: C.muted }}>{label}</div>
-                </div>
-              ))}
+            <div style={{ marginTop: 8, fontSize: 10, color: C.muted }}>
+              Top reason: <span style={{ color: C.text }}>{agent.topReason.length > 20 ? agent.topReason.slice(0, 20) + "…" : agent.topReason}</span>
             </div>
-            <div style={{ fontSize: 11, fontWeight: 600, color: C.muted, textTransform: "uppercase", letterSpacing: .5, marginBottom: 6 }}>Top Reasons</div>
-            {Object.entries(sel.reasons).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([reason, count]) => (
-              <div key={reason} style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", borderBottom: `1px solid ${C.border}`, fontSize: 12 }}>
-                <span style={{ color: C.sub, maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{reason}</span>
-                <span style={{ fontWeight: 500 }}>{count}</span>
-              </div>
-            ))}
-          </Card>
-        )}
+            <div style={{ marginTop: 6, fontSize: 10, color: C.accent, fontWeight: 500 }}>View full profile →</div>
+          </div>
+        ))}
       </div>
     </div>
   );
 }
 
 /* ─── TICKET EXPLORER TAB ────────────────────────────────────── */
-function TicketExplorerTab({ tickets }) {
+function TicketExplorerTab({ tickets, onTicketClick }) {
   const [channel, setChannel] = useState("All");
   const [reason, setReason] = useState("All");
   const [status, setStatus] = useState("All");
@@ -886,6 +833,8 @@ function TicketExplorerTab({ tickets }) {
   const pageRows = filtered.slice((page - 1) * PAGE, page * PAGE);
   useEffect(() => setPage(1), [channel, reason, status, happiness, slaF, q]);
 
+  const thStyle = { padding: "10px 12px", textAlign: "left", fontSize: 10, color: C.muted, textTransform: "uppercase", letterSpacing: .5, fontWeight: 500, whiteSpace: "nowrap" };
+
   return (
     <div>
       <div style={{ marginBottom: 16 }}>
@@ -902,10 +851,10 @@ function TicketExplorerTab({ tickets }) {
           </svg>
         </div>
         {[["Channel", channels, channel, setChannel], ["Reason", reasons.slice(0, 30), reason, setReason],
-        ["Status", ["All", "Open", "Closed", "Resolved"], status, setStatus],
-        ["AI Signal", aiOpts, aiFilter, setAiFilter],
-        ["CSAT", ["All", "Good", "Okay", "Bad"], happiness, setHappiness],
-        ["SLA", slaOpts, slaF, setSlaF],
+          ["Status", ["All", "Open", "Closed", "Resolved"], status, setStatus],
+          ["AI Signal", aiOpts, aiFilter, setAiFilter],
+          ["CSAT", ["All", "Good", "Okay", "Bad"], happiness, setHappiness],
+          ["SLA", slaOpts, slaF, setSlaF],
         ].map(([label, opts, val, fn]) => (
           <select key={label} value={val} onChange={e => fn(e.target.value)}
             style={{ padding: "8px 10px", border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 12, background: C.white, color: C.text, cursor: "pointer" }}>
@@ -926,8 +875,9 @@ function TicketExplorerTab({ tickets }) {
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
               <thead>
                 <tr style={{ background: "#F9F8F7", borderBottom: `1px solid ${C.border}` }}>
-                  {["Date", "Subject", "Channel", "Reason", "AI Sentiment", "AI Score", "CSAT", "SLA"].map(h => (
-                    <th key={h} style={{ padding: "10px 12px", textAlign: "left", fontSize: 10, color: C.muted, textTransform: "uppercase", letterSpacing: .5, fontWeight: 500, whiteSpace: "nowrap" }}>{h}</th>
+                  <th style={thStyle}>TICKET #</th>
+                  {["Date", "Subject", "Channel", "Reason", "AI Sentiment", "AI Score", "CSAT"].map(h => (
+                    <th key={h} style={thStyle}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -935,6 +885,12 @@ function TicketExplorerTab({ tickets }) {
                 {pageRows.map(t => (
                   <tr key={t.id} onClick={() => setSelected(selected?.id === t.id ? null : t)}
                     style={{ borderBottom: `1px solid #F4F2EE`, cursor: "pointer", background: selected?.id === t.id ? C.accentL : "transparent" }}>
+                    <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>
+                      <span onClick={e => { e.stopPropagation(); onTicketClick && onTicketClick(t.id); }}
+                        style={{ color: C.accent, cursor: "pointer", fontWeight: 600, fontSize: 11 }}>
+                        #{t.id}
+                      </span>
+                    </td>
                     <td style={{ padding: "9px 12px", color: C.muted, whiteSpace: "nowrap", fontSize: 11 }}>{(t.createdTime || "").slice(0, 10)}</td>
                     <td style={{ padding: "9px 12px", maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={t.subject}>{t.subject}</td>
                     <td style={{ padding: "9px 12px" }}>
@@ -943,14 +899,12 @@ function TicketExplorerTab({ tickets }) {
                     <td style={{ padding: "9px 12px", color: C.sub, fontSize: 11, maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.reason}</td>
                     <td style={{ padding: "9px 12px" }}>
                       {t.finalSentiment ? (
-                        <span style={{ 
-                          fontSize: 10, padding: "2px 7px", borderRadius: 8, 
+                        <span style={{
+                          fontSize: 10, padding: "2px 7px", borderRadius: 8,
                           background: t.finalSentiment.includes("Positive") ? "#DCFCE7" : t.finalSentiment.includes("Negative") ? "#FEE2E2" : "#FEF3C7",
                           color: t.finalSentiment.includes("Positive") ? "#16A34A" : t.finalSentiment.includes("Negative") ? "#DC2626" : "#D97706",
                           fontWeight: 600
-                        }}>
-                          {t.finalSentiment}
-                        </span>
+                        }}>{t.finalSentiment}</span>
                       ) : <span style={{ color: C.muted }}>—</span>}
                     </td>
                     <td style={{ padding: "9px 12px" }}>
@@ -961,12 +915,7 @@ function TicketExplorerTab({ tickets }) {
                       ) : "—"}
                     </td>
                     <td style={{ padding: "9px 12px" }}>
-                      {t.happiness
-                        ? <span style={{ fontSize: 10, fontWeight: 600, color: HP_COLORS[t.happiness] || C.muted }}>{t.happiness}</span>
-                        : <span style={{ color: C.muted }}>—</span>}
-                    </td>
-                    <td style={{ padding: "9px 12px", fontSize: 11, color: t.slaViolation === "Not Violated" ? "#10B981" : t.slaViolation ? "#EF4444" : C.muted }}>
-                      {t.slaViolation === "Not Violated" ? "✓ OK" : t.slaViolation ? "✗ Violated" : "—"}
+                      {t.happiness ? <span style={{ fontSize: 10, fontWeight: 600, color: HP_COLORS[t.happiness] || C.muted }}>{t.happiness}</span> : <span style={{ color: C.muted }}>—</span>}
                     </td>
                   </tr>
                 ))}
@@ -991,8 +940,6 @@ function TicketExplorerTab({ tickets }) {
               <div style={{ fontSize: 14, fontWeight: 700 }}>Ticket #{selected.id}</div>
               <button onClick={() => setSelected(null)} style={{ background: "none", border: "none", color: C.muted, cursor: "pointer", fontSize: 20, lineHeight: 1 }}>×</button>
             </div>
-            
-            {/* AI Summary Section */}
             {selected.sentimentSummary && (
               <div style={{ marginBottom: 16 }}>
                 <div style={{ fontSize: 10, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: .5, marginBottom: 6 }}>AI Analysis Summary</div>
@@ -1001,11 +948,8 @@ function TicketExplorerTab({ tickets }) {
                 </div>
               </div>
             )}
-
-            {/* AI KPIs */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16 }}>
-              {[
-                ["Quality Score", `${selected.overallQualityScore}/10`, selected.overallQualityScore >= 7 ? "#10B981" : "#EF4444"],
+              {[["Quality Score", `${selected.overallQualityScore}/10`, selected.overallQualityScore >= 7 ? "#10B981" : "#EF4444"],
                 ["Sentiment Shift", selected.sentimentShift || "Neutral", null],
                 ["Issue Type", selected.issueType || "Unknown", C.accent],
                 ["Root Cause", selected.rootCause || "Unknown", null],
@@ -1016,14 +960,10 @@ function TicketExplorerTab({ tickets }) {
                 </div>
               ))}
             </div>
-
-            {/* Detailed Parameters */}
             <div style={{ marginBottom: 16 }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: .5, marginBottom: 8 }}>Quality Parameters</div>
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                {[
-                  ["Empathy Score", selected.empathyScore, 10],
-                  ["Knowledge Accuracy", selected.knowledgeAccuracy, 10],
+                {[["Empathy Score", selected.empathyScore, 10],["Knowledge Accuracy", selected.knowledgeAccuracy, 10],
                   ["Policy Compliance", selected.policyCompliance ? "✓ Yes" : "✗ No", null],
                   ["One-Touch Resolution", selected.oneTouchResolutionAI ? "✓ Yes" : "✗ No", null],
                   ["Fraud Suspicion", selected.fraudSuspicion ? "⚠️ Yes" : "No", null],
@@ -1031,28 +971,20 @@ function TicketExplorerTab({ tickets }) {
                 ].map(([l, v, max]) => (
                   <div key={l} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 11, padding: "2px 0" }}>
                     <span style={{ color: C.sub }}>{l}</span>
-                    <span style={{ fontWeight: 600, color: v === "✗ No" || v === "⚠️ Yes" || v === "🚫 Yes" ? "#EF4444" : C.text }}>
-                      {v}{max ? `/${max}` : ""}
-                    </span>
+                    <span style={{ fontWeight: 600, color: v === "✗ No" || v === "⚠️ Yes" || v === "🚫 Yes" ? "#EF4444" : C.text }}>{v}{max ? `/${max}` : ""}</span>
                   </div>
                 ))}
               </div>
             </div>
-
             {selected.monetaryValue > 0 && (
               <div style={{ background: "#FFFBEB", border: "1px solid #FEF3C7", padding: 12, borderRadius: 8, marginBottom: 16 }}>
                 <div style={{ fontSize: 9, color: "#D97706", fontWeight: 700, textTransform: "uppercase" }}>Financial Impact</div>
                 <div style={{ fontSize: 18, fontWeight: 800, color: "#D97706" }}>{selected.monetaryValue.toLocaleString()} SAR</div>
               </div>
             )}
-
-            {/* Basic Info */}
             <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 12 }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: .5, marginBottom: 8 }}>Basic Information</div>
-              {[
-                ["Merchant", selected.merchantName],
-                ["Reason", selected.reason],
-                ["Subject", selected.subject],
+              {[["Merchant", selected.merchantName],["Reason", selected.reason],["Subject", selected.subject],
                 ["Created", (selected.createdTime || "").slice(0, 16).replace("T", " ")],
               ].map(([l, v]) => (
                 <div key={l} style={{ marginBottom: 6 }}>
@@ -1061,6 +993,12 @@ function TicketExplorerTab({ tickets }) {
                 </div>
               ))}
             </div>
+            {onTicketClick && (
+              <button onClick={() => onTicketClick(selected.id)}
+                style={{ marginTop: 12, width: "100%", padding: "8px 0", background: C.accent, color: "#fff", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                Open in Chat Review →
+              </button>
+            )}
           </Card>
         )}
       </div>
@@ -1128,7 +1066,6 @@ function MacroTab({ merchants }) {
             ))}
           </div>
         </Card>
-
         <Card>
           <ChartTitle>Priority Distribution</ChartTitle>
           <ResponsiveContainer width="100%" height={180}>
@@ -1165,7 +1102,6 @@ function MacroTab({ merchants }) {
             </BarChart>
           </ResponsiveContainer>
         </Card>
-
         <Card>
           <ChartTitle>Price Tier Distribution</ChartTitle>
           <ResponsiveContainer width="100%" height={180}>
@@ -1213,7 +1149,6 @@ function ProfilerTab({ merchants, anonKey, initialMerchant, tickets }) {
   const [semanticNames, setSemanticNames] = useState(null);
   // eslint-disable-next-line no-unused-vars
   const [err, setErr] = useState("");
-
   const [modelReady, setModelReady] = useState(false);
   const [modelProgress, setModelProgress] = useState(0);
   const extractorRef = useRef(null);
@@ -1237,7 +1172,6 @@ function ProfilerTab({ merchants, anonKey, initialMerchant, tickets }) {
     try {
       const output = await extractorRef.current(query, { pooling: 'mean', normalize: true });
       const queryVector = Array.from(output.data);
-
       const res = await fetch(`${SB_URL}/rest/v1/rpc/match_merchants`, {
         method: "POST",
         headers: sbH(anonKey),
@@ -1245,7 +1179,6 @@ function ProfilerTab({ merchants, anonKey, initialMerchant, tickets }) {
       });
       const data = await res.json();
       if (!Array.isArray(data)) throw new Error("Invalid RPC response");
-
       const exactMatches = merchants.filter(m => m.Merchant.toLowerCase().includes(query.toLowerCase())).map(m => m.Merchant);
       const aiResults = data.map(d => d.merchant_name);
       setSemanticNames([...new Set([...exactMatches, ...aiResults])]);
@@ -1258,39 +1191,27 @@ function ProfilerTab({ merchants, anonKey, initialMerchant, tickets }) {
 
   const merchantBranchesMap = useMemo(() => {
     const map = {};
-    for (const m of merchants) {
-      map[m.Merchant] = (map[m.Merchant] || 0) + Math.max(1, m.Branches || 0);
-    }
+    for (const m of merchants) map[m.Merchant] = (map[m.Merchant] || 0) + Math.max(1, m.Branches || 0);
     return map;
   }, [merchants]);
 
   const filtered = useMemo(() => {
     if (!query) return [];
     const map = new Map();
-
     if (semanticNames && semanticNames.length > 0) {
       for (const name of semanticNames) {
         const found = merchants.find(m => m.Merchant === name || m.OriginalMerchant === name);
-        if (found && !map.has(found.Merchant)) {
-          map.set(found.Merchant, { ...found, TotalKsaBranches: merchantBranchesMap[found.Merchant] });
-        }
+        if (found && !map.has(found.Merchant)) map.set(found.Merchant, { ...found, TotalKsaBranches: merchantBranchesMap[found.Merchant] });
       }
       return Array.from(map.values());
     }
-
     const q = query.toLowerCase();
     const qNorm = normArabic(q);
-
-    // 1. Exact Matches
     for (const m of merchants) {
       if (m.Merchant.toLowerCase().includes(q) || m.City.toLowerCase().includes(q) || m.Mall.toLowerCase().includes(q) || normArabic(m.Merchant).includes(qNorm)) {
-        if (!map.has(m.Merchant)) {
-          map.set(m.Merchant, { ...m, TotalKsaBranches: merchantBranchesMap[m.Merchant] });
-        }
+        if (!map.has(m.Merchant)) map.set(m.Merchant, { ...m, TotalKsaBranches: merchantBranchesMap[m.Merchant] });
       }
     }
-
-    // 2. Fuzzy Fallback (if no exact matches found)
     if (map.size === 0 && qNorm.length >= 3) {
       const fuzzy = [];
       const seen = new Set();
@@ -1298,17 +1219,11 @@ function ProfilerTab({ merchants, anonKey, initialMerchant, tickets }) {
         if (seen.has(m.Merchant)) continue;
         const mNorm = normArabic(m.Merchant);
         const dist = editDist(qNorm, mNorm);
-        if (dist <= 3) {
-          fuzzy.push({ m, dist });
-          seen.add(m.Merchant);
-        }
+        if (dist <= 3) { fuzzy.push({ m, dist }); seen.add(m.Merchant); }
       }
       fuzzy.sort((a, b) => a.dist - b.dist);
-      for (const item of fuzzy.slice(0, 15)) {
-        map.set(item.m.Merchant, { ...item.m, TotalKsaBranches: merchantBranchesMap[item.m.Merchant] });
-      }
+      for (const item of fuzzy.slice(0, 15)) map.set(item.m.Merchant, { ...item.m, TotalKsaBranches: merchantBranchesMap[item.m.Merchant] });
     }
-
     return Array.from(map.values()).slice(0, 15);
   }, [query, merchants, merchantBranchesMap, semanticNames]);
 
@@ -1408,7 +1323,6 @@ function ProfilerTab({ merchants, anonKey, initialMerchant, tickets }) {
               </div>
             )}
           </Card>
-
           <Card style={{ padding: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
             <MerchantProfiler initialMerchant={selected} embedded={true} tickets={tickets} />
           </Card>
@@ -1436,13 +1350,10 @@ function PipelineTab({ merchants, onMerchantClick, statuses, onStatusChange }) {
   const pageSize = 100;
 
   const allCities = useMemo(() => ["All", ...new Set(merchants.map(m => m.City).filter(Boolean))].sort(), [merchants]);
-
-  // Mall list depends on selected city
   const allMalls = useMemo(() => {
     const list = city === "All" ? merchants : merchants.filter(m => m.City === city);
     return ["All", ...new Set(list.map(m => m.Mall).filter(Boolean))].sort();
   }, [merchants, city]);
-
   const allCategories = useMemo(() => ["All", ...new Set(merchants.map(m => m.Category).filter(c => c && c !== "Uncategorized"))].sort(), [merchants]);
   const allSubCategories = useMemo(() => ["All", ...new Set(merchants.map(m => m.SubCategory).filter(s => s && s !== "General"))].sort(), [merchants]);
   const allPrices = useMemo(() => ["All", ...new Set(merchants.map(m => m.AvgPrice).filter(Boolean))].sort(), [merchants]);
@@ -1527,17 +1438,14 @@ function PipelineTab({ merchants, onMerchantClick, statuses, onStatusChange }) {
             <select value={val} onChange={e => fn(e.target.value)}
               style={{ padding: "8px 12px", border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 13, background: C.white, color: C.text, outline: "none", cursor: "pointer", minWidth: 140, boxShadow: "0 1px 2px rgba(0,0,0,0.05)" }}>
               {opts.map((o, i) => (
-                <option key={i} value={o}>
-                  {o === "All" ? (placeholder || `${label}: All`) : (o.length > 25 ? o.substring(0, 25) + "..." : o)}
-                </option>
+                <option key={i} value={o}>{o === "All" ? (placeholder || `${label}: All`) : (o.length > 25 ? o.substring(0, 25) + "..." : o)}</option>
               ))}
             </select>
           </div>
         ))}
-
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <button onClick={() => { setCity("All"); setMall("All"); setPrio("All"); setCat("All"); setSubCat("All"); setPrice("All"); setHours("All"); }}
-            style={{ padding: "8px 14px", background: "#F4F2EE", border: "none", borderRadius: 8, fontSize: 12, color: C.text, cursor: "pointer", fontWeight: 600, transition: "background .2s", height: 35 }}>
+            style={{ padding: "8px 14px", background: "#F4F2EE", border: "none", borderRadius: 8, fontSize: 12, color: C.text, cursor: "pointer", fontWeight: 600, height: 35 }}>
             Clear Filters
           </button>
           <span style={{ fontSize: 12, color: C.muted, fontWeight: 500 }}>{filteredMerchants.length.toLocaleString()} matches</span>
@@ -1561,9 +1469,7 @@ function PipelineTab({ merchants, onMerchantClick, statuses, onStatusChange }) {
                 return (
                   <tr key={i} style={{ borderBottom: `1px solid #F4F2EE` }}>
                     <td style={{ padding: "9px 12px", fontWeight: 500, maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", direction: "rtl" }}>
-                      <span onClick={() => onMerchantClick(m)} style={{ cursor: "pointer", color: C.accent, textDecoration: "underline" }} title="View AI Profile">
-                        {m.Merchant}
-                      </span>
+                      <span onClick={() => onMerchantClick(m)} style={{ cursor: "pointer", color: C.accent, textDecoration: "underline" }} title="View AI Profile">{m.Merchant}</span>
                     </td>
                     <td style={{ padding: "9px 12px" }}><span style={{ background: "#EFF6FF", color: "#1D4ED8", borderRadius: 4, padding: "2px 7px", fontSize: 10 }}>{m.City}</span></td>
                     <td style={{ padding: "9px 12px", fontSize: 11, color: C.muted, maxWidth: 110, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.Mall}</td>
@@ -1594,9 +1500,7 @@ function PipelineTab({ merchants, onMerchantClick, statuses, onStatusChange }) {
               style={{ padding: "6px 12px", background: page === 1 ? "#F4F2EE" : C.white, border: `1px solid ${C.border}`, borderRadius: 6, fontSize: 11, color: page === 1 ? C.muted : C.text, cursor: page === 1 ? "not-allowed" : "pointer" }}>
               Previous
             </button>
-            <div style={{ padding: "0 10px", fontSize: 11, fontWeight: 500, color: C.text }}>
-              Page {page} of {totalPages || 1}
-            </div>
+            <div style={{ padding: "0 10px", fontSize: 11, fontWeight: 500 }}>Page {page} of {totalPages || 1}</div>
             <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages || totalPages === 0}
               style={{ padding: "6px 12px", background: page >= totalPages ? "#F4F2EE" : C.white, border: `1px solid ${C.border}`, borderRadius: 6, fontSize: 11, color: page >= totalPages ? C.muted : C.text, cursor: page >= totalPages ? "not-allowed" : "pointer" }}>
               Next
@@ -1615,23 +1519,11 @@ function MallsTab({ merchants, onMerchantClick, statuses, onStatusChange }) {
   const [sortBy, setSortBy] = useState("merchants");
   const [selectedMall, setSelectedMall] = useState(null);
 
-  // Aggregate malls data
   const mallsData = useMemo(() => {
     const map = {};
     for (const m of merchants) {
       if (!m.Mall) continue;
-      if (!map[m.Mall]) {
-        map[m.Mall] = {
-          name: m.Mall,
-          city: m.City,
-          merchants: 0,
-          ratingSum: 0,
-          ratingCount: 0,
-          reviewsTotal: 0,
-          categories: {},
-          highCount: 0,
-        };
-      }
+      if (!map[m.Mall]) map[m.Mall] = { name: m.Mall, city: m.City, merchants: 0, ratingSum: 0, ratingCount: 0, reviewsTotal: 0, categories: {}, highCount: 0 };
       const d = map[m.Mall];
       d.merchants++;
       if (m.Rating > 0) { d.ratingSum += m.Rating; d.ratingCount++; }
@@ -1659,7 +1551,6 @@ function MallsTab({ merchants, onMerchantClick, statuses, onStatusChange }) {
     });
   }, [mallsData, cityFilter, search, sortBy]);
 
-  // ── Mall Detail View ──
   if (selectedMall) {
     const mallMerchants = merchants.filter(m => m.Mall === selectedMall.name);
     const statusStyles = {
@@ -1670,7 +1561,6 @@ function MallsTab({ merchants, onMerchantClick, statuses, onStatusChange }) {
     };
     return (
       <div>
-        {/* Header */}
         <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 20 }}>
           <button onClick={() => setSelectedMall(null)}
             style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", background: C.white, border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 12, color: C.sub, cursor: "pointer", fontWeight: 500 }}>
@@ -1679,21 +1569,15 @@ function MallsTab({ merchants, onMerchantClick, statuses, onStatusChange }) {
           </button>
           <div>
             <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: "-.4px" }}>{selectedMall.name}</div>
-            <div style={{ fontSize: 13, color: C.muted, marginTop: 2 }}>
-              {selectedMall.city} · {mallMerchants.length} merchants · ★ {selectedMall.avgRating}
-            </div>
+            <div style={{ fontSize: 13, color: C.muted, marginTop: 2 }}>{selectedMall.city} · {mallMerchants.length} merchants · ★ {selectedMall.avgRating}</div>
           </div>
         </div>
-
-        {/* Stats row */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 10, marginBottom: 18 }}>
           <KPI label="Total Merchants" value={mallMerchants.length} sub="In this mall" />
           <KPI label="Avg Rating" value={`${selectedMall.avgRating} ★`} sub="Mall average" color="#16A34A" />
           <KPI label="Total Reviews" value={selectedMall.reviewsTotal.toLocaleString()} sub="Across merchants" />
           <KPI label="High Priority" value={selectedMall.highCount} sub="BD opportunities" color={C.accent} />
         </div>
-
-        {/* Merchants Table */}
         <div style={{ background: C.white, borderRadius: 10, border: `1px solid ${C.border}`, overflow: "hidden" }}>
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
@@ -1714,11 +1598,7 @@ function MallsTab({ merchants, onMerchantClick, statuses, onStatusChange }) {
                       </td>
                       <td style={{ padding: "10px 12px", color: C.sub }}>{m.Category}</td>
                       <td style={{ padding: "10px 12px" }}>
-                        <span style={{
-                          fontSize: 10, fontWeight: 600, padding: "2px 7px", borderRadius: 4,
-                          background: m.Priority.toLowerCase().includes("high") ? "#FEE2E2" : m.Priority.toLowerCase().includes("medium") ? "#FEF3C7" : "#F0FDF4",
-                          color: m.Priority.toLowerCase().includes("high") ? "#DC2626" : m.Priority.toLowerCase().includes("medium") ? "#92400E" : "#15803D"
-                        }}>{m.Priority}</span>
+                        <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 7px", borderRadius: 4, background: m.Priority.toLowerCase().includes("high") ? "#FEE2E2" : m.Priority.toLowerCase().includes("medium") ? "#FEF3C7" : "#F0FDF4", color: m.Priority.toLowerCase().includes("high") ? "#DC2626" : m.Priority.toLowerCase().includes("medium") ? "#92400E" : "#15803D" }}>{m.Priority}</span>
                       </td>
                       <td style={{ padding: "10px 12px" }}>{m.Rating > 0 ? `★ ${m.Rating}` : "—"}</td>
                       <td style={{ padding: "10px 12px", color: C.sub }}>{m.Reviews > 0 ? m.Reviews.toLocaleString() : "—"}</td>
@@ -1741,19 +1621,13 @@ function MallsTab({ merchants, onMerchantClick, statuses, onStatusChange }) {
     );
   }
 
-  // ── Malls Grid View ──
   return (
     <div>
       <div style={{ marginBottom: 20 }}>
         <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: "-.4px" }}>Malls Profile</div>
-        <div style={{ fontSize: 13, color: C.muted, marginTop: 3 }}>
-          {filtered.length} malls · {merchants.filter(m => m.Mall).length.toLocaleString()} merchants across KSA
-        </div>
+        <div style={{ fontSize: 13, color: C.muted, marginTop: 3 }}>{filtered.length} malls · {merchants.filter(m => m.Mall).length.toLocaleString()} merchants across KSA</div>
       </div>
-
-      {/* Filters */}
       <div style={{ display: "flex", gap: 12, marginBottom: 20, alignItems: "center", flexWrap: "wrap" }}>
-        {/* Search */}
         <div style={{ position: "relative" }}>
           <svg style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} width={13} height={13} viewBox="0 0 24 24" fill="none" stroke={C.muted} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
             <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
@@ -1761,8 +1635,6 @@ function MallsTab({ merchants, onMerchantClick, statuses, onStatusChange }) {
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search malls…"
             style={{ paddingLeft: 32, paddingRight: 12, paddingTop: 8, paddingBottom: 8, border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 13, outline: "none", background: C.white, color: C.text, width: 200 }} />
         </div>
-
-        {/* City Filter */}
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           <label style={{ fontSize: 10, fontWeight: 600, color: C.muted, textTransform: "uppercase", letterSpacing: .5 }}>City</label>
           <select value={cityFilter} onChange={e => setCityFilter(e.target.value)}
@@ -1770,8 +1642,6 @@ function MallsTab({ merchants, onMerchantClick, statuses, onStatusChange }) {
             {allCities.map(c => <option key={c} value={c}>{c === "All" ? "All Cities" : c}</option>)}
           </select>
         </div>
-
-        {/* Sort */}
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           <label style={{ fontSize: 10, fontWeight: 600, color: C.muted, textTransform: "uppercase", letterSpacing: .5 }}>Sort By</label>
           <select value={sortBy} onChange={e => setSortBy(e.target.value)}
@@ -1781,25 +1651,18 @@ function MallsTab({ merchants, onMerchantClick, statuses, onStatusChange }) {
             <option value="reviews">Most Reviews</option>
           </select>
         </div>
-
         <span style={{ marginLeft: "auto", fontSize: 12, color: C.muted, fontWeight: 500 }}>{filtered.length} malls</span>
       </div>
-
-      {/* Cards Grid */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 14 }}>
         {filtered.map((mall, i) => (
           <div key={i} onClick={() => setSelectedMall(mall)}
             style={{ background: C.white, borderRadius: 12, border: `1px solid ${C.border}`, padding: 20, cursor: "pointer", transition: "all .18s", boxShadow: "0 1px 3px rgba(0,0,0,.05)" }}
             onMouseEnter={e => { e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,.1)"; e.currentTarget.style.borderColor = C.accent; }}
             onMouseLeave={e => { e.currentTarget.style.boxShadow = "0 1px 3px rgba(0,0,0,.05)"; e.currentTarget.style.borderColor = C.border; }}>
-
-            {/* Header */}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
               <div>
                 <div style={{ fontSize: 14, fontWeight: 700, color: C.text, lineHeight: 1.3, marginBottom: 4 }}>{mall.name}</div>
-                <span style={{ fontSize: 10, fontWeight: 600, padding: "3px 8px", borderRadius: 12, background: C.accentL, color: C.accent }}>
-                  {mall.city}
-                </span>
+                <span style={{ fontSize: 10, fontWeight: 600, padding: "3px 8px", borderRadius: 12, background: C.accentL, color: C.accent }}>{mall.city}</span>
               </div>
               <div style={{ width: 40, height: 40, borderRadius: 10, background: C.accentL, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                 <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke={C.accent} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
@@ -1807,41 +1670,377 @@ function MallsTab({ merchants, onMerchantClick, statuses, onStatusChange }) {
                 </svg>
               </div>
             </div>
-
-            {/* Stats Row */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 14 }}>
-              <div style={{ background: "#F9F8F7", borderRadius: 8, padding: "8px 10px", textAlign: "center" }}>
-                <div style={{ fontSize: 16, fontWeight: 700, color: C.text }}>{mall.merchants}</div>
-                <div style={{ fontSize: 10, color: C.muted, marginTop: 2 }}>Merchants</div>
-              </div>
-              <div style={{ background: "#F9F8F7", borderRadius: 8, padding: "8px 10px", textAlign: "center" }}>
-                <div style={{ fontSize: 16, fontWeight: 700, color: mall.avgRating >= 4 ? "#16A34A" : mall.avgRating >= 3 ? "#D97706" : C.accent }}>
-                  {mall.avgRating > 0 ? `★ ${mall.avgRating}` : "—"}
+              {[["Merchants", mall.merchants], ["Avg Rating", mall.avgRating > 0 ? `★ ${mall.avgRating}` : "—"], ["Reviews", mall.reviewsTotal >= 1000 ? `${(mall.reviewsTotal / 1000).toFixed(1)}k` : mall.reviewsTotal]].map(([l, v]) => (
+                <div key={l} style={{ background: "#F9F8F7", borderRadius: 8, padding: "8px 10px", textAlign: "center" }}>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: l === "Avg Rating" && mall.avgRating >= 4 ? "#16A34A" : l === "Avg Rating" && mall.avgRating >= 3 ? "#D97706" : C.text }}>{v}</div>
+                  <div style={{ fontSize: 10, color: C.muted, marginTop: 2 }}>{l}</div>
                 </div>
-                <div style={{ fontSize: 10, color: C.muted, marginTop: 2 }}>Avg Rating</div>
-              </div>
-              <div style={{ background: "#F9F8F7", borderRadius: 8, padding: "8px 10px", textAlign: "center" }}>
-                <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>
-                  {mall.reviewsTotal >= 1000 ? `${(mall.reviewsTotal / 1000).toFixed(1)}k` : mall.reviewsTotal}
-                </div>
-                <div style={{ fontSize: 10, color: C.muted, marginTop: 2 }}>Reviews</div>
-              </div>
+              ))}
             </div>
-
-            {/* Footer */}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div style={{ fontSize: 11, color: C.muted }}>
-                Top: <span style={{ color: C.text, fontWeight: 500 }}>{mall.topCategory}</span>
-              </div>
+              <div style={{ fontSize: 11, color: C.muted }}>Top: <span style={{ color: C.text, fontWeight: 500 }}>{mall.topCategory}</span></div>
               {mall.highCount > 0 && (
-                <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 7px", borderRadius: 10, background: "#FEE2E2", color: "#DC2626" }}>
-                  {mall.highCount} High ↑
-                </span>
+                <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 7px", borderRadius: 10, background: "#FEE2E2", color: "#DC2626" }}>{mall.highCount} High ↑</span>
               )}
             </div>
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+/* ─── CHAT REVIEW ────────────────────────────────────────────── */
+function parseMessages(subject, owner) {
+  if (!subject || subject === "—" || subject.length < 30) return null;
+  // Try to split by agent/customer turn markers (HH:MM patterns)
+  const timePattern = /(\d{1,2}:\d{2}(?:\s*[AP]M)?)/gi;
+  const agentName = (owner || "").split("@")[0];
+  // Split on lines that look like "Name HH:MM" or "HH:MM"
+  const lines = subject.split(/\n|\r\n|\r/).filter(l => l.trim());
+  if (lines.length < 2) return null;
+  const messages = [];
+  let currentSender = "customer";
+  let currentText = [];
+  let currentTime = "";
+  for (const line of lines) {
+    const isAgent = agentName && line.toLowerCase().includes(agentName.toLowerCase());
+    const timeMatch = line.match(timePattern);
+    const time = timeMatch ? timeMatch[0] : "";
+    if (timeMatch || isAgent) {
+      if (currentText.length > 0) {
+        messages.push({ sender: currentSender, text: currentText.join(" ").trim(), time: currentTime });
+        currentText = [];
+      }
+      currentSender = isAgent ? "agent" : "customer";
+      currentTime = time;
+      const cleaned = line.replace(timePattern, "").replace(agentName, "").replace(/^[\s:|-]+/, "").trim();
+      if (cleaned) currentText.push(cleaned);
+    } else {
+      currentText.push(line.trim());
+    }
+  }
+  if (currentText.length > 0) messages.push({ sender: currentSender, text: currentText.join(" ").trim(), time: currentTime });
+  return messages.length >= 2 ? messages : null;
+}
+
+function ChatBubble({ msg }) {
+  const isAgent = msg.sender === "agent";
+  return (
+    <div style={{ display: "flex", flexDirection: isAgent ? "row-reverse" : "row", gap: 8, alignItems: "flex-end" }}>
+      <div style={{ width: 36, height: 36, borderRadius: "50%", background: isAgent ? C.accentL : "#E8E4DF", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>
+        {isAgent ? "🤖" : "👤"}
+      </div>
+      <div style={{ maxWidth: "65%" }}>
+        <div style={{
+          padding: "10px 14px",
+          borderRadius: isAgent ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
+          background: isAgent ? C.accentL : C.white,
+          boxShadow: "0 1px 3px rgba(0,0,0,.06)",
+          fontSize: 12, lineHeight: 1.5, color: C.text,
+        }}>
+          {msg.text}
+        </div>
+        {msg.time && <div style={{ fontSize: 10, color: C.muted, marginTop: 3, textAlign: isAgent ? "right" : "left" }}>{msg.time}</div>}
+      </div>
+    </div>
+  );
+}
+
+function ChatReview({ tickets, initialTicketId }) {
+  const [selectedId, setSelectedId] = useState(initialTicketId || null);
+  const [searchQ, setSearchQ] = useState("");
+  const threadRef = useRef(null);
+
+  const filteredList = useMemo(() => {
+    const q = searchQ.toLowerCase();
+    return tickets.filter(t =>
+      !q || String(t.id).includes(q) || t.subject.toLowerCase().includes(q) ||
+      t.owner.toLowerCase().includes(q) || t.reason.toLowerCase().includes(q)
+    ).sort((a, b) => b.createdTime.localeCompare(a.createdTime));
+  }, [tickets, searchQ]);
+
+  const selected = useMemo(() => tickets.find(t => t.id === selectedId) || null, [tickets, selectedId]);
+  const messages = useMemo(() => selected ? parseMessages(selected.subject, selected.owner) : null, [selected]);
+
+  useEffect(() => {
+    if (threadRef.current) threadRef.current.scrollTop = threadRef.current.scrollHeight;
+  }, [selectedId]);
+
+  const qColor = s => s >= 7 ? "#10B981" : s >= 4 ? "#FBBF24" : "#EF4444";
+
+  return (
+    <div style={{ display: "flex", height: "calc(100vh - 96px)", borderRadius: 12, overflow: "hidden", border: `1px solid ${C.border}`, background: C.white }}>
+      {/* Left panel — conversation list */}
+      <div style={{ width: 320, borderRight: `1px solid ${C.border}`, display: "flex", flexDirection: "column", flexShrink: 0 }}>
+        <div style={{ padding: 16, borderBottom: `1px solid ${C.border}` }}>
+          <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 10 }}>Conversations</div>
+          <div style={{ position: "relative" }}>
+            <input value={searchQ} onChange={e => setSearchQ(e.target.value)} placeholder="Search tickets…"
+              style={{ width: "100%", padding: "8px 10px 8px 30px", border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 12, outline: "none", background: "#F9F8F7", boxSizing: "border-box" }} />
+            <svg style={{ position: "absolute", left: 9, top: "50%", transform: "translateY(-50%)" }} width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={C.muted} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
+            </svg>
+          </div>
+        </div>
+        <div style={{ flex: 1, overflowY: "auto" }}>
+          {filteredList.map(t => (
+            <div key={t.id} onClick={() => setSelectedId(t.id)}
+              style={{ padding: "12px 16px", cursor: "pointer", borderBottom: `1px solid #F4F2EE`, background: selectedId === t.id ? C.accentL : "transparent", borderLeft: selectedId === t.id ? `3px solid ${C.accent}` : "3px solid transparent", transition: "all .1s" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: C.text }}>#{t.id}</div>
+                {t.happiness && (
+                  <span style={{ fontSize: 10, fontWeight: 600, padding: "1px 6px", borderRadius: 10, background: t.happiness === "Good" ? "#DCFCE7" : t.happiness === "Bad" ? "#FEE2E2" : "#FEF3C7", color: t.happiness === "Good" ? "#16A34A" : t.happiness === "Bad" ? "#DC2626" : "#D97706" }}>
+                    {t.happiness}
+                  </span>
+                )}
+              </div>
+              <div style={{ fontSize: 11, color: C.sub, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginBottom: 2 }}>{t.subject}</div>
+              <div style={{ fontSize: 10, color: C.muted }}>{(t.createdTime || "").slice(0, 10)} · {t.channel}</div>
+            </div>
+          ))}
+          {filteredList.length === 0 && (
+            <div style={{ textAlign: "center", padding: 40, color: C.muted, fontSize: 12 }}>No tickets found</div>
+          )}
+        </div>
+      </div>
+
+      {/* Right panel — chat thread */}
+      {selected ? (
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
+          {/* Header */}
+          <div style={{ padding: "14px 20px", borderBottom: `1px solid ${C.border}`, background: "linear-gradient(to right, #F9F8F7, #FFFFFF)", display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 700 }}>Ticket #{selected.id}</div>
+              <div style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>{selected.owner || "Unknown Agent"} · {selected.channel}</div>
+            </div>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              {selected.overallQualityScore > 0 && (
+                <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 9px", borderRadius: 6, background: `${qColor(selected.overallQualityScore)}22`, color: qColor(selected.overallQualityScore) }}>
+                  Q: {selected.overallQualityScore}/10
+                </span>
+              )}
+              {selected.happiness && (
+                <span style={{ fontSize: 11, fontWeight: 600, padding: "3px 9px", borderRadius: 6, background: selected.happiness === "Good" ? "#DCFCE7" : selected.happiness === "Bad" ? "#FEE2E2" : "#FEF3C7", color: selected.happiness === "Good" ? "#16A34A" : selected.happiness === "Bad" ? "#DC2626" : "#D97706" }}>
+                  {selected.happiness}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* AI Banner */}
+          {selected.sentimentSummary && (
+            <div style={{ padding: "10px 20px", background: C.accentL, borderBottom: `1px solid ${C.border}`, fontSize: 12, color: C.accent, fontStyle: "italic", flexShrink: 0 }}>
+              💡 {selected.sentimentSummary}
+            </div>
+          )}
+
+          {/* Messages */}
+          <div ref={threadRef} style={{ flex: 1, overflowY: "auto", padding: 20, display: "flex", flexDirection: "column", gap: 14, background: C.bg }}>
+            {messages ? (
+              messages.map((msg, i) => <ChatBubble key={i} msg={msg} />)
+            ) : (
+              <div style={{ background: C.white, borderRadius: 12, padding: 16, boxShadow: "0 1px 3px rgba(0,0,0,.06)" }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: .5, marginBottom: 10 }}>Raw Log</div>
+                <div style={{ fontSize: 12, color: C.sub, lineHeight: 1.7 }}>{selected.subject}</div>
+                <div style={{ marginTop: 14, paddingTop: 14, borderTop: `1px solid ${C.border}`, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                  {[["Reason", selected.reason], ["Channel", selected.channel], ["Issue Type", selected.issueType || "—"], ["Root Cause", selected.rootCause || "—"], ["Merchant", selected.merchantName || "—"], ["Country", selected.country || "—"]].map(([l, v]) => (
+                    <div key={l}>
+                      <div style={{ fontSize: 9, color: C.muted, textTransform: "uppercase", marginBottom: 1 }}>{l}</div>
+                      <div style={{ fontSize: 11, fontWeight: 500, color: C.text }}>{v}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Footer info strip */}
+          <div style={{ padding: "10px 20px", borderTop: `1px solid ${C.border}`, background: C.white, display: "flex", gap: 16, fontSize: 11, color: C.muted, flexShrink: 0, flexWrap: "wrap" }}>
+            {[["Created", (selected.createdTime || "").slice(0, 16).replace("T", " ")], ["Status", selected.status], ["SLA", selected.slaViolation === "Not Violated" ? "✓ OK" : selected.slaViolation || "—"], ["Sentiment", selected.finalSentiment || "—"]].map(([l, v]) => (
+              <span key={l}><strong style={{ color: C.sub }}>{l}:</strong> {v}</span>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: C.muted }}>
+          <div style={{ fontSize: 48, marginBottom: 12 }}>💬</div>
+          <div style={{ fontSize: 14, fontWeight: 500 }}>Select a conversation</div>
+          <div style={{ fontSize: 12, marginTop: 4 }}>Choose a ticket from the list to review</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─── AGENT PROFILE ──────────────────────────────────────────── */
+function AgentProfile({ agentId, tickets, onBack, onTicketClick }) {
+  const agentTickets = useMemo(() => tickets.filter(t => t.owner === agentId), [tickets, agentId]);
+  const agentName = agentId;
+
+  const stats = useMemo(() => {
+    let good = 0, bad = 0, okay = 0, rated = 0, slaOk = 0, slaTotal = 0, escalated = 0;
+    let resTotal = 0, resCount = 0, reassigns = 0;
+    const reasons = {}, channels = {};
+    const analyzed = agentTickets.filter(t => t.aiStatus === "completed");
+    agentTickets.forEach(t => {
+      if (t.happiness === "Good") { good++; rated++; }
+      if (t.happiness === "Bad") { bad++; rated++; }
+      if (t.happiness === "Okay") { okay++; rated++; }
+      if (t.slaViolation) { slaTotal++; if (t.slaViolation === "Not Violated") slaOk++; }
+      if (t.isEscalated) escalated++;
+      if (t.resolutionMs > 0) { resTotal += t.resolutionMs; resCount++; }
+      reassigns += t.numReassign;
+      if (t.reason) reasons[t.reason] = (reasons[t.reason] || 0) + 1;
+      if (t.channel) channels[t.channel] = (channels[t.channel] || 0) + 1;
+    });
+    const avgQuality = analyzed.length ? (analyzed.reduce((s, t) => s + t.overallQualityScore, 0) / analyzed.length).toFixed(1) : "—";
+    const avgEmpathy = analyzed.length ? (analyzed.reduce((s, t) => s + t.empathyScore, 0) / analyzed.length).toFixed(1) : "—";
+    return {
+      csat: rated ? Math.round(good / rated * 100) : null,
+      slaRate: slaTotal ? Math.round(slaOk / slaTotal * 100) : null,
+      avgRes: resCount ? (resTotal / resCount / 3600000).toFixed(1) : null,
+      escalated, reassigns, rated, good, bad, okay,
+      avgQuality, avgEmpathy, analyzed: analyzed.length,
+      topReasons: Object.entries(reasons).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([name, value]) => ({ name: name.length > 20 ? name.slice(0, 20) + "…" : name, value })),
+      channelData: Object.entries(channels).sort((a, b) => b[1] - a[1]).map(([name, value]) => ({ name, value, color: CH_COLORS[name] || "#94A3B8" })),
+    };
+  }, [agentTickets]);
+
+  const recentTickets = useMemo(() => [...agentTickets].sort((a, b) => b.createdTime.localeCompare(a.createdTime)).slice(0, 20), [agentTickets]);
+
+  return (
+    <div>
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 24 }}>
+        <button onClick={onBack}
+          style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", background: C.white, border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 12, color: C.sub, cursor: "pointer", fontWeight: 500 }}>
+          <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M12 5l-7 7 7 7" /></svg>
+          Back to Agents
+        </button>
+        <div style={{ flex: 1 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: "-.4px" }}>{agentName}</div>
+            {stats.csat !== null && (
+              <span style={{ fontSize: 12, fontWeight: 700, padding: "3px 10px", borderRadius: 8, background: stats.csat >= 70 ? "#DCFCE7" : stats.csat >= 50 ? "#FEF3C7" : "#FEE2E2", color: stats.csat >= 70 ? "#16A34A" : stats.csat >= 50 ? "#D97706" : "#DC2626" }}>
+                CSAT {stats.csat}%
+              </span>
+            )}
+          </div>
+          <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>{agentTickets.length.toLocaleString()} tickets · {stats.analyzed} AI-analyzed</div>
+        </div>
+      </div>
+
+      {/* KPI Grid */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(6,1fr)", gap: 12, marginBottom: 20 }}>
+        <KPI label="CSAT" value={stats.csat !== null ? `${stats.csat}%` : "N/A"} sub={`${stats.rated} rated`} color={stats.csat !== null ? (stats.csat >= 70 ? "#10B981" : stats.csat >= 50 ? "#FBBF24" : "#EF4444") : null} />
+        <KPI label="SLA Rate" value={stats.slaRate !== null ? `${stats.slaRate}%` : "N/A"} sub="Not violated" color={stats.slaRate !== null ? (stats.slaRate >= 90 ? "#10B981" : stats.slaRate >= 70 ? "#FBBF24" : "#EF4444") : null} />
+        <KPI label="Avg Resolution" value={stats.avgRes ? `${stats.avgRes}h` : "N/A"} sub="Per ticket" />
+        <KPI label="Escalated" value={stats.escalated} sub="Total" color={stats.escalated > 10 ? "#EF4444" : C.text} />
+        <KPI label="Reassignments" value={stats.reassigns} sub="Total" />
+        <KPI label="AI Quality" value={`${stats.avgQuality}/10`} sub={`${stats.analyzed} analyzed`} color={parseFloat(stats.avgQuality) >= 7 ? "#10B981" : "#FBBF24"} />
+      </div>
+
+      {/* Good / Okay / Bad */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12, marginBottom: 20 }}>
+        {[["Good", stats.good, "#10B981"], ["Okay", stats.okay, "#FBBF24"], ["Bad", stats.bad, "#EF4444"]].map(([l, v, c]) => (
+          <div key={l} style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 10, padding: "14px 16px", textAlign: "center" }}>
+            <div style={{ fontSize: 28, fontWeight: 800, color: c }}>{v}</div>
+            <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>{l} ratings</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Charts Row */}
+      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gap: 16, marginBottom: 20 }}>
+        <Card>
+          <ChartTitle>Top Ticket Reasons</ChartTitle>
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={stats.topReasons} layout="vertical" barCategoryGap="20%">
+              <XAxis type="number" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
+              <YAxis dataKey="name" type="category" tick={{ fontSize: 10 }} width={140} axisLine={false} tickLine={false} />
+              <Tooltip content={<CustomTip />} />
+              <Bar dataKey="value" name="Tickets" fill={C.accent} radius={[0, 3, 3, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </Card>
+        <Card>
+          <ChartTitle>Channel Distribution</ChartTitle>
+          <ResponsiveContainer width="100%" height={160}>
+            <PieChart>
+              <Pie data={stats.channelData} cx="50%" cy="50%" outerRadius={60} dataKey="value">
+                {stats.channelData.map((d, i) => <Cell key={i} fill={d.color} />)}
+              </Pie>
+              <Tooltip formatter={v => v.toLocaleString()} />
+            </PieChart>
+          </ResponsiveContainer>
+          <div style={{ display: "flex", flexDirection: "column", gap: 3, marginTop: 6 }}>
+            {stats.channelData.slice(0, 4).map(d => (
+              <div key={d.name} style={{ display: "flex", justifyContent: "space-between", fontSize: 11 }}>
+                <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  <span style={{ width: 7, height: 7, borderRadius: "50%", background: d.color, flexShrink: 0 }} />{d.name}
+                </span>
+                <span style={{ fontWeight: 500 }}>{d.value}</span>
+              </div>
+            ))}
+          </div>
+        </Card>
+        <Card>
+          <ChartTitle>Quality Scores</ChartTitle>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 8 }}>
+            {[["AI Quality", stats.avgQuality, 10], ["AI Empathy", stats.avgEmpathy, 10]].map(([l, v, max]) => (
+              <div key={l}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 4 }}>
+                  <span style={{ color: C.sub }}>{l}</span>
+                  <span style={{ fontWeight: 700, color: parseFloat(v) >= 7 ? "#10B981" : "#FBBF24" }}>{v}/{max}</span>
+                </div>
+                <div style={{ background: C.border, borderRadius: 4, height: 6, overflow: "hidden" }}>
+                  <div style={{ background: parseFloat(v) >= 7 ? "#10B981" : "#FBBF24", height: "100%", width: `${Math.min(100, parseFloat(v) / max * 100)}%`, borderRadius: 4 }} />
+                </div>
+              </div>
+            ))}
+            <KPI label="Rated Tickets" value={stats.rated} sub="Have CSAT score" />
+          </div>
+        </Card>
+      </div>
+
+      {/* Recent Tickets Table */}
+      <Card style={{ padding: 0, overflow: "hidden" }}>
+        <div style={{ padding: "14px 16px", borderBottom: `1px solid ${C.border}` }}>
+          <div style={{ fontSize: 13, fontWeight: 600 }}>Recent Tickets</div>
+          <div style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>Last {recentTickets.length} tickets handled</div>
+        </div>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+          <thead>
+            <tr style={{ background: "#F9F8F7", borderBottom: `1px solid ${C.border}` }}>
+              {["Date", "Ticket #", "Reason", "Channel", "CSAT", "AI Score"].map(h => (
+                <th key={h} style={{ padding: "10px 14px", textAlign: "left", fontSize: 10, color: C.muted, textTransform: "uppercase", letterSpacing: .5, fontWeight: 500 }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {recentTickets.map(t => (
+              <tr key={t.id} style={{ borderBottom: `1px solid #F4F2EE` }}>
+                <td style={{ padding: "9px 14px", color: C.muted, fontSize: 11 }}>{(t.createdTime || "").slice(0, 10)}</td>
+                <td style={{ padding: "9px 14px" }}>
+                  <span onClick={() => onTicketClick && onTicketClick(t.id)} style={{ color: C.accent, cursor: "pointer", fontWeight: 600 }}>#{t.id}</span>
+                </td>
+                <td style={{ padding: "9px 14px", color: C.sub, maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.reason}</td>
+                <td style={{ padding: "9px 14px" }}>
+                  <span style={{ fontSize: 10, padding: "2px 7px", borderRadius: 8, background: `${CH_COLORS[t.channel] || "#94A3B8"}22`, color: CH_COLORS[t.channel] || "#94A3B8", fontWeight: 500 }}>{t.channel}</span>
+                </td>
+                <td style={{ padding: "9px 14px" }}>
+                  {t.happiness ? <span style={{ fontSize: 10, fontWeight: 600, color: HP_COLORS[t.happiness] }}>{t.happiness}</span> : <span style={{ color: C.muted }}>—</span>}
+                </td>
+                <td style={{ padding: "9px 14px" }}>
+                  {t.overallQualityScore > 0 ? <span style={{ fontWeight: 700, color: t.overallQualityScore >= 7 ? "#10B981" : t.overallQualityScore >= 4 ? "#FBBF24" : "#EF4444" }}>{t.overallQualityScore}</span> : "—"}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </Card>
     </div>
   );
 }
@@ -1854,24 +2053,36 @@ export default function App() {
   const [loadingCity, setLoadingCity] = useState("");
   const [tab, setTab] = useState("macro");
   const [selectedMerchantForProfile, setSelectedMerchantForProfile] = useState(null);
-  const [statuses, setStatuses] = useState({});  // { "MerchantName|Mall": "status" }
+  const [statuses, setStatuses] = useState({});
   const [statusSaving, setStatusSaving] = useState(false); // eslint-disable-line no-unused-vars
-
-  // ── Support / CRM data ──────────────────────────────────────
   const [tickets, setTickets] = useState([]);
   const [ticketsLoaded, setTicketsLoaded] = useState(false);
   const [ticketsLoading, setTicketsLoading] = useState(false);
+  const [selectedTicketId, setSelectedTicketId] = useState(null);
+  const [selectedAgentId, setSelectedAgentId] = useState(null);
 
   const handleMerchantClick = (merchant) => {
     setSelectedMerchantForProfile(merchant);
     setTab("profiler");
   };
 
+  const handleTicketClick = (ticketId) => {
+    setSelectedTicketId(ticketId);
+    setTab("chat");
+    if (session) logAudit(anonKey, session.access_token, session.user.id, "view_ticket", ticketId);
+    loadTickets();
+  };
+
+  const handleAgentClick = (agentId) => {
+    setSelectedAgentId(agentId);
+    setTab("agentProfile");
+    if (session) logAudit(anonKey, session.access_token, session.user.id, "view_agent", agentId);
+  };
+
   const handleTabChange = (id) => {
     setTab(id);
-    if (["support", "agents", "tickets"].includes(id)) {
-      loadTickets();
-    }
+    if (session) logAudit(anonKey, session.access_token, session.user.id, "navigate", id);
+    if (["support", "agents", "tickets", "chat"].includes(id)) loadTickets();
   };
 
   useEffect(() => {
@@ -1879,7 +2090,6 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session]);
 
-  // Lazy-load tickets only when a support tab is first opened
   async function loadTickets() {
     if (ticketsLoaded || ticketsLoading) return;
     setTicketsLoading(true);
@@ -1888,82 +2098,69 @@ export default function App() {
       const rows = await sbFetch("ticket_analysis", anonKey, session.access_token, cols);
       setTickets(Array.isArray(rows) ? rows.map(normTicket) : []);
       setTicketsLoaded(true);
-    } catch (e) {
-      console.warn("Tickets load failed:", e.message);
-    }
+    } catch (e) { console.warn("Tickets load failed:", e.message); }
     setTicketsLoading(false);
   }
 
   async function loadAllMerchants() {
     const all = [];
     for (const city of CITIES) {
+      const cached = merchantCache.get(city);
+      if (cached && Date.now() - cached.ts < CACHE_TTL) {
+        all.push(...cached.data);
+        continue;
+      }
       setLoadingCity(city);
       try {
         const rows = await sbFetch(`merchants_${city}`, anonKey, session.access_token);
-        if (Array.isArray(rows)) all.push(...rows.map(norm));
+        if (Array.isArray(rows)) {
+          const normalized = rows.map(norm);
+          merchantCache.set(city, { data: normalized, ts: Date.now() });
+          all.push(...normalized);
+        }
       } catch (e) { console.warn(`Skip ${city}:`, e.message); }
     }
     setMerchants(all);
     setLoadingCity("");
-    // Load statuses after merchants are ready
     if (session) await loadStatuses();
   }
 
   async function loadStatuses() {
     try {
-      const r = await fetch(
-        `${SB_URL}/rest/v1/merchant_status?select=merchant_name,mall,status&limit=10000`,
-        { headers: sbH(anonKey, session.access_token) }
-      );
+      const r = await fetch(`${SB_URL}/rest/v1/merchant_status?select=merchant_name,mall,status&limit=10000`, { headers: sbH(anonKey, session.access_token) });
       if (!r.ok) return;
       const rows = await r.json();
       const map = {};
-      for (const row of rows) {
-        map[`${row.merchant_name}|${row.mall || ""}`] = row.status;
-      }
+      for (const row of rows) map[`${row.merchant_name}|${row.mall || ""}`] = row.status;
       setStatuses(map);
     } catch (e) { console.warn("Could not load statuses:", e.message); }
   }
 
   async function handleStatusChange(merchant, newStatus) {
     const key = `${merchant.Merchant}|${merchant.Mall || ""}`;
-    // Optimistic update — instant UI
     setStatuses(prev => ({ ...prev, [key]: newStatus }));
-    // Persist to Supabase
+    if (session) logAudit(anonKey, session.access_token, session.user.id, "status_change", key, { old: statuses[key], new: newStatus });
     try {
       setStatusSaving(true);
       await fetch(`${SB_URL}/rest/v1/merchant_status`, {
         method: "POST",
-        headers: {
-          ...sbH(anonKey, session.access_token),
-          "Prefer": "resolution=merge-duplicates"
-        },
-        body: JSON.stringify({
-          user_id: session.user.id,
-          user_email: session.user.email,
-          merchant_name: merchant.Merchant,
-          mall: merchant.Mall || "",
-          city: merchant.City || "",
-          status: newStatus,
-          updated_at: new Date().toISOString()
-        })
+        headers: { ...sbH(anonKey, session.access_token), "Prefer": "resolution=merge-duplicates" },
+        body: JSON.stringify({ user_id: session.user.id, user_email: session.user.email, merchant_name: merchant.Merchant, mall: merchant.Mall || "", city: merchant.City || "", status: newStatus, updated_at: new Date().toISOString() })
       });
     } catch (e) { console.warn("Status save failed:", e.message); }
     finally { setStatusSaving(false); }
   }
 
   const TABS = [
-    // ── KSA Merchant Intelligence ──────────────────────────────
-    { id: "macro",    label: "Market Overview",              group: "KSA Intelligence", d: "M4 15l4-8 4 4 4-6 4 6" },
-    { id: "profiler", label: "Merchant Profiler",            group: "KSA Intelligence", d: "M12 12c2.7 0 5-2.3 5-5s-2.3-5-5-5-5 2.3-5 5 2.3 5 5 5zm0 2c-3.3 0-10 1.7-10 5v1h20v-1c0-3.3-6.7-5-10-5z" },
-    { id: "malls",    label: "Malls Profile",                group: "KSA Intelligence", d: "M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4zM3 6h18M16 10a4 4 0 01-8 0" },
-    { id: "pipeline", label: "Acquisition Pipeline",         group: "KSA Intelligence", d: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" },
-    // ── CRM & Support Quality ──────────────────────────────────
-    { id: "support",  label: "Support Overview",             group: "CRM & Support",    d: "M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" },
-    { id: "agents",   label: "Agent Performance",            group: "CRM & Support",    d: "M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" },
-    { id: "tickets",  label: "Ticket Explorer",              group: "CRM & Support",    d: "M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8zM14 2v6h6M16 13H8M16 17H8M10 9H8" },
+    { id: "macro",    label: "Market Overview",      group: "KSA Intelligence", d: "M4 15l4-8 4 4 4-6 4 6" },
+    { id: "profiler", label: "Merchant Profiler",    group: "KSA Intelligence", d: "M12 12c2.7 0 5-2.3 5-5s-2.3-5-5-5-5 2.3-5 5 2.3 5 5 5zm0 2c-3.3 0-10 1.7-10 5v1h20v-1c0-3.3-6.7-5-10-5z" },
+    { id: "malls",    label: "Malls Profile",        group: "KSA Intelligence", d: "M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4zM3 6h18M16 10a4 4 0 01-8 0" },
+    { id: "pipeline", label: "Acquisition Pipeline", group: "KSA Intelligence", d: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" },
+    { id: "support",  label: "Support Overview",     group: "CRM & Support",    d: "M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" },
+    { id: "agents",   label: "Agent Performance",    group: "CRM & Support",    d: "M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" },
+    { id: "tickets",  label: "Ticket Explorer",      group: "CRM & Support",    d: "M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8zM14 2v6h6M16 13H8M16 17H8M10 9H8" },
+    { id: "chat",     label: "Chat Review",          group: "CRM & Support",    d: "M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" },
   ];
-
 
   const canonicalMap = useMemo(() => {
     const counts = {};
@@ -1983,22 +2180,13 @@ export default function App() {
         if (Math.abs(n1.length - n2.length) > 2) continue;
         const dist = editDist(n1, n2);
         const threshold = n1.length >= 7 ? 2 : 1;
-        if (dist <= threshold && n1[0] === n2[0]) {
-          mapToCan[other] = name;
-          processed.add(other);
-        }
+        if (dist <= threshold && n1[0] === n2[0]) { mapToCan[other] = name; processed.add(other); }
       }
     }
     return mapToCan;
   }, [merchants]);
 
-  const unifiedMerchants = useMemo(() => {
-    return merchants.map(m => ({
-      ...m,
-      OriginalMerchant: m.Merchant,
-      Merchant: canonicalMap[m.Merchant] || m.Merchant
-    }));
-  }, [merchants, canonicalMap]);
+  const unifiedMerchants = useMemo(() => merchants.map(m => ({ ...m, OriginalMerchant: m.Merchant, Merchant: canonicalMap[m.Merchant] || m.Merchant })), [merchants, canonicalMap]);
 
   const sidebarStats = useMemo(() => [
     ["Total", unifiedMerchants.length.toLocaleString()],
@@ -2008,8 +2196,10 @@ export default function App() {
   ], [unifiedMerchants]);
 
   if (!anonKey) return <SetupScreen onSetup={setAnonKey} />;
-  if (!session) return <LoginScreen anonKey={anonKey} onLogin={setSession} />;
+  if (!session) return <LoginScreen anonKey={anonKey} onLogin={(s) => { setSession(s); if (s) logAudit(anonKey, s.access_token, s.user.id, "login", "auth"); }} />;
   if (loadingCity) return <LoadingScreen city={loadingCity} />;
+
+  const visibleTabs = TABS.filter(t => t.id !== "agentProfile");
 
   return (
     <div style={{ display: "flex", height: "100vh", fontFamily: "-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif", background: C.bg, color: C.text, overflow: "hidden" }}>
@@ -2017,7 +2207,7 @@ export default function App() {
       <div style={{ width: 216, background: C.white, borderRight: `1px solid ${C.border}`, display: "flex", flexDirection: "column", flexShrink: 0 }}>
         <div style={{ padding: "20px 16px 14px", borderBottom: `1px solid ${C.border}` }}>
           <WaffarhaLogo height={26} style={{ marginBottom: 6 }} />
-          <div style={{ fontSize: 11, color: C.muted, fontWeight: 500 }}>KSA Merchant Intelligence</div>
+          <div style={{ fontSize: 11, color: C.muted, fontWeight: 500 }}>Waffarha Nexus</div>
         </div>
 
         <nav style={{ padding: "10px 8px", flex: 1, overflowY: "auto" }}>
@@ -2026,11 +2216,12 @@ export default function App() {
               <div style={{ fontSize: 9, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: 1, padding: "8px 10px 4px", marginTop: group === "CRM & Support" ? 8 : 0 }}>
                 {group}
               </div>
-              {TABS.filter(t => t.group === group).map(({ id, label, d }) => (
-                <div key={id} onClick={() => handleTabChange(id)} style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 10px", borderRadius: 8, cursor: "pointer", fontSize: 12, color: tab === id ? C.accent : C.sub, background: tab === id ? C.accentL : "transparent", fontWeight: tab === id ? 600 : 400, marginBottom: 1, transition: "all .12s" }}>
+              {visibleTabs.filter(t => t.group === group).map(({ id, label, d }) => (
+                <div key={id} onClick={() => handleTabChange(id)}
+                  style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 10px", borderRadius: 8, cursor: "pointer", fontSize: 12, color: (tab === id || (id === "agents" && tab === "agentProfile")) ? C.accent : C.sub, background: (tab === id || (id === "agents" && tab === "agentProfile")) ? C.accentL : "transparent", fontWeight: (tab === id || (id === "agents" && tab === "agentProfile")) ? 600 : 400, marginBottom: 1, transition: "all .12s" }}>
                   <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d={d} /></svg>
                   <span style={{ lineHeight: 1.3 }}>{label}</span>
-                  {group === "CRM & Support" && ticketsLoading && tab === id && (
+                  {group === "CRM & Support" && ticketsLoading && (tab === id) && (
                     <span style={{ marginLeft: "auto", fontSize: 9, color: C.muted }}>loading…</span>
                   )}
                 </div>
@@ -2078,10 +2269,16 @@ export default function App() {
           : <SupportTab tickets={tickets} />)}
         {tab === "agents" && (ticketsLoading
           ? <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "60vh", color: C.muted, fontSize: 13 }}>Loading tickets…</div>
-          : <AgentsTab tickets={tickets} />)}
+          : <AgentsTab tickets={tickets} onAgentClick={handleAgentClick} />)}
         {tab === "tickets" && (ticketsLoading
           ? <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "60vh", color: C.muted, fontSize: 13 }}>Loading tickets…</div>
-          : <TicketExplorerTab tickets={tickets} />)}
+          : <TicketExplorerTab tickets={tickets} onTicketClick={handleTicketClick} />)}
+        {tab === "chat" && (ticketsLoading
+          ? <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "60vh", color: C.muted, fontSize: 13 }}>Loading tickets…</div>
+          : <ChatReview tickets={tickets} initialTicketId={selectedTicketId} />)}
+        {tab === "agentProfile" && (
+          <AgentProfile agentId={selectedAgentId} tickets={tickets} onBack={() => setTab("agents")} onTicketClick={handleTicketClick} />
+        )}
       </main>
     </div>
   );

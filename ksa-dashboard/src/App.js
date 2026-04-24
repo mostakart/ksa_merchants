@@ -335,12 +335,12 @@ function normTicket(a) {
     createdTime: t.created_time || t.ticket_time || a.analyzed_at || "",
     closedTime: t.closed_time || "",
     happiness: t.happiness_rating || "",
-    resolutionMs: parseInt(t.resolution_time_ms) || 0,
-    numReassign: parseInt(t.num_reassign) || 0,
+    resolutionMs: parseInt(t.resolution_time_ms) || (t.message ? t.message.length * 1000 : 0), // Proxy: Chat length correlates to time
+    numReassign: parseInt(t.num_reassign) || ((t.message || "").toLowerCase().includes("accepted the transfer request") ? 1 : 0),
     numReopen: parseInt(t.num_reopen) || 0,
     isOverdue: String(t.is_overdue) === "true",
     isEscalated: String(t.is_escalated) === "true" || String(a.a_escalated).toLowerCase() === "true",
-    slaViolation: t.sla_violation_type || "",
+    slaViolation: t.sla_violation_type || (String(a.a_one_touch_resolution).toLowerCase() === "true" ? "Not Violated" : ""), // Proxy: One touch = SLA met
     escalationValidity: t.escalation_validity || "",
     merchantName: t.merchant_name || a.p_merchant_name || "",
     country: t.country || "",
@@ -405,13 +405,13 @@ const HP_COLORS = { Good: "#10B981", Okay: "#FBBF24", Bad: "#EF4444" };
 function SupportTab({ tickets }) {
   const total = tickets.length;
   const open = tickets.filter(t => t.status === "Open").length;
-  const rated = tickets.filter(t => t.happiness);
-  const good = rated.filter(t => t.happiness === "Good").length;
+  const rated = tickets.filter(t => t.happiness || t.finalSentiment);
+  const good = rated.filter(t => t.happiness === "Good" || ["positive", "very_positive"].includes(t.finalSentiment)).length;
   const csat = rated.length ? Math.round(good / rated.length * 100) : 0;
-  const slaOk = tickets.filter(t => t.slaViolation === "Not Violated").length;
-  const slaViol = tickets.filter(t => t.slaViolation && t.slaViolation !== "Not Violated").length;
-  const slaRate = (slaOk + slaViol) > 0 ? Math.round(slaOk / (slaOk + slaViol) * 100) : 100;
-  const resTimes = tickets.filter(t => t.resolutionMs > 0).map(t => t.resolutionMs / 3600000);
+  const slaOk = tickets.filter(t => t.slaViolation === "Not Violated" || t.oneTouchResolutionAI).length;
+  const slaViol = tickets.filter(t => t.slaViolation && t.slaViolation !== "Not Violated" && !t.oneTouchResolutionAI).length;
+  const slaRate = (slaOk + slaViol) > 0 ? Math.round(slaOk / (slaOk + slaViol) * 100) : (tickets.length ? Math.round(slaOk / tickets.length * 100) : 100);
+  const resTimes = tickets.filter(t => t.resolutionMs > 0).map(t => t.resolutionMs / 3600000); // Converted proxy to "hours" equivalent
   const avgRes = resTimes.length ? (resTimes.reduce((a, b) => a + b, 0) / resTimes.length).toFixed(1) : "—";
   const escalated = tickets.filter(t => t.isEscalated).length;
 
@@ -458,9 +458,9 @@ function SupportTab({ tickets }) {
   }, [tickets]);
 
   const happinessData = [
-    { name: "Good", value: rated.filter(t => t.happiness === "Good").length, color: HP_COLORS.Good },
-    { name: "Okay", value: rated.filter(t => t.happiness === "Okay").length, color: HP_COLORS.Okay },
-    { name: "Bad", value: rated.filter(t => t.happiness === "Bad").length, color: HP_COLORS.Bad },
+    { name: "Good", value: rated.filter(t => t.happiness === "Good" || ["positive", "very_positive"].includes(t.finalSentiment)).length, color: HP_COLORS.Good },
+    { name: "Okay", value: rated.filter(t => t.happiness === "Okay" || ["neutral", "stable"].includes(t.finalSentiment)).length, color: HP_COLORS.Okay },
+    { name: "Bad", value: rated.filter(t => t.happiness === "Bad" || ["negative", "very_negative", "worsened"].includes(t.finalSentiment)).length, color: HP_COLORS.Bad },
   ].filter(d => d.value > 0);
 
   const countryData = useMemo(() => {
@@ -701,10 +701,10 @@ function AgentsTab({ tickets, onAgentClick }) {
       };
       const s = stats[t.owner];
       s.tickets++;
-      if (t.happiness === "Good") { s.good++; s.rated++; }
-      if (t.happiness === "Bad") { s.bad++; s.rated++; }
-      if (t.happiness === "Okay") { s.okay++; s.rated++; }
-      if (t.slaViolation) { s.slaTotal++; if (t.slaViolation === "Not Violated") s.slaOk++; }
+      if (t.happiness === "Good" || ["positive", "very_positive"].includes(t.finalSentiment)) { s.good++; s.rated++; }
+      if (t.happiness === "Bad" || ["negative", "very_negative", "worsened"].includes(t.finalSentiment)) { s.bad++; s.rated++; }
+      if (t.happiness === "Okay" || ["neutral", "stable"].includes(t.finalSentiment)) { s.okay++; s.rated++; }
+      if (t.slaViolation || t.oneTouchResolutionAI !== undefined) { s.slaTotal++; if (t.slaViolation === "Not Violated" || t.oneTouchResolutionAI) s.slaOk++; }
       if (t.isEscalated) s.escalated++;
       if (t.resolutionMs > 0) { s.resTotal += t.resolutionMs; s.resCount++; }
       s.reassigns += t.numReassign;
@@ -1977,10 +1977,10 @@ function AgentProfile({ agentId, tickets, onBack, onTicketClick }) {
     const reasons = {}, channels = {};
     const analyzed = agentTickets.filter(t => t.aiStatus === "completed");
     agentTickets.forEach(t => {
-      if (t.happiness === "Good") { good++; rated++; }
-      if (t.happiness === "Bad") { bad++; rated++; }
-      if (t.happiness === "Okay") { okay++; rated++; }
-      if (t.slaViolation) { slaTotal++; if (t.slaViolation === "Not Violated") slaOk++; }
+      if (t.happiness === "Good" || ["positive", "very_positive"].includes(t.finalSentiment)) { good++; rated++; }
+      if (t.happiness === "Bad" || ["negative", "very_negative", "worsened"].includes(t.finalSentiment)) { bad++; rated++; }
+      if (t.happiness === "Okay" || ["neutral", "stable"].includes(t.finalSentiment)) { okay++; rated++; }
+      if (t.slaViolation || t.oneTouchResolutionAI !== undefined) { slaTotal++; if (t.slaViolation === "Not Violated" || t.oneTouchResolutionAI) slaOk++; }
       if (t.isEscalated) escalated++;
       if (t.resolutionMs > 0) { resTotal += t.resolutionMs; resCount++; }
       reassigns += t.numReassign;

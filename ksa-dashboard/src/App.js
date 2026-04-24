@@ -1141,10 +1141,12 @@ function MacroTab({ merchants }) {
         </Card>
         <Card>
           <ChartTitle>Price Tier Distribution</ChartTitle>
-          <ResponsiveContainer width="100%" height={180}>
+          <ResponsiveContainer width="100%" height={240}>
             <PieChart>
-              <Pie data={priceTiers} cx="50%" cy="50%" outerRadius={72} dataKey="value"
-                label={({ name, percent }) => `${(percent * 100).toFixed(0)}%`} labelLine={false}>
+              <Pie data={priceTiers} cx="50%" cy="50%" outerRadius={60} dataKey="value"
+                label={({ percent }) => percent > 0.01 ? `${(percent * 100).toFixed(0)}%` : ""}
+                labelLine={true}
+                paddingAngle={2}>
                 {priceTiers.map((e, i) => <Cell key={i} fill={e.color} />)}
               </Pie>
               <Tooltip formatter={v => v.toLocaleString()} />

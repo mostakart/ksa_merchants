@@ -721,6 +721,11 @@ function AgentsTab({ tickets, onAgentClick }) {
     }));
   }, [tickets, agentMap]);
 
+  const sorted = useMemo(() => [...agentStats].sort((a, b) => {
+    if (sortBy === "tickets") return b.tickets - a.tickets;
+    if (sortBy === "csat") return (b.csat ?? -1) - (a.csat ?? -1);
+    if (sortBy === "sla") return (b.slaRate ?? -1) - (a.slaRate ?? -1);
+    if (sortBy === "resolution") return parseFloat(a.avgRes ?? 9999) - parseFloat(b.avgRes ?? 9999);
     return 0;
   }), [agentStats, sortBy]);
 
@@ -1579,6 +1584,14 @@ function MallsTab({ merchants, onMerchantClick, statuses, onStatusChange }) {
 
   const allCities = useMemo(() => ["All", ...new Set(mallsData.map(m => m.city).filter(Boolean)).values()].sort(), [mallsData]);
 
+  const filtered = useMemo(() => {
+    let list = mallsData;
+    if (cityFilter !== "All") list = list.filter(m => m.city === cityFilter);
+    if (search.trim()) list = list.filter(m => m.name.toLowerCase().includes(search.toLowerCase()));
+    return [...list].sort((a, b) => {
+      if (sortBy === "rating") return b.avgRating - a.avgRating;
+      if (sortBy === "reviews") return b.reviewsTotal - a.reviewsTotal;
+      return b.merchants - a.merchants;
     });
   }, [mallsData, cityFilter, search, sortBy]);
 
@@ -1814,6 +1827,11 @@ function ChatReview({ tickets, initialTicketId }) {
   const pageSize = 50;
   const threadRef = useRef(null);
 
+  const filteredList = useMemo(() => {
+    const q = searchQ.toLowerCase();
+    return tickets.filter(t =>
+      !q || String(t.id).includes(q) || t.subject.toLowerCase().includes(q) ||
+      t.owner.toLowerCase().includes(q) || t.reason.toLowerCase().includes(q)
     ).sort((a, b) => b.createdTime.localeCompare(a.createdTime));
   }, [tickets, searchQ]);
 
@@ -1876,7 +1894,6 @@ function ChatReview({ tickets, initialTicketId }) {
               style={{ padding: "4px 8px", background: page >= totalPages ? "transparent" : C.white, border: `1px solid ${C.border}`, borderRadius: 4, fontSize: 10, cursor: page >= totalPages ? "not-allowed" : "pointer", color: C.muted }}>→</button>
           </div>
         )}
-        </div>
       </div>
 
       {/* Right panel — chat thread */}

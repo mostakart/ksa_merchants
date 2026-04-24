@@ -294,22 +294,17 @@ function LoginScreen({ anonKey, onLogin }) {
 }
 
 /* ─── LOADING SCREEN ─────────────────────────────────────────── */
-function LoadingScreen({ city }) {
+function LoadingScreen() {
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh", alignItems: "center", justifyContent: "center", background: C.bg, gap: 24, textAlign: "center", padding: 20 }}>
-      <WaffarhaLogo height={60} style={{ marginBottom: 10 }} />
+      <WaffarhaLogo height={65} style={{ marginBottom: -5 }} />
       
       <div style={{ maxWidth: 500 }}>
-        <div style={{ fontSize: 24, fontWeight: 800, color: C.text, marginBottom: 8, letterSpacing: "-0.5px" }}>
-          Waffarha Nexus
+        <div style={{ fontSize: 32, fontWeight: 800, color: C.text, marginBottom: 8, letterSpacing: "-1px" }}>
+          Nexus
         </div>
-        <div style={{ fontSize: 16, color: C.sub, fontWeight: 600, marginBottom: 16 }}>
-          End-to-End Internal Portal
-        </div>
-        <div style={{ fontSize: 17, color: C.text, lineHeight: 1.6, direction: "rtl", fontWeight: 500 }}>
-          بوابتك لكل المعلومات اللي هتحتاجها ومش هتلاقيها إلا هنا...
-          <br />
-          ذكاء بيانات تجار وفرها في مكان واحد.
+        <div style={{ fontSize: 16, color: C.sub, fontWeight: 500, lineHeight: 1.6, maxWidth: 420, margin: "0 auto" }}>
+          The end-to-end internal portal for exclusive merchant intelligence insights you won't find anywhere else.
         </div>
       </div>
 
@@ -317,10 +312,6 @@ function LoadingScreen({ city }) {
         {[0, 150, 300].map(d => (
           <div key={d} style={{ width: 8, height: 8, borderRadius: "50%", background: C.accent, animation: "bounce .7s infinite alternate", animationDelay: `${d}ms` }} />
         ))}
-      </div>
-
-      <div style={{ fontSize: 12, color: C.muted, marginTop: 5 }}>
-        Loading <strong style={{ color: C.text }}>{city}</strong> data...
       </div>
       
       <style>{`@keyframes bounce { to { transform:translateY(-6px);opacity:.3; } }`}</style>
@@ -2218,7 +2209,7 @@ export default function App() {
 
   if (!anonKey) return <SetupScreen onSetup={setAnonKey} />;
   if (!session) return <LoginScreen anonKey={anonKey} onLogin={(s) => { setSession(s); if (s) logAudit(anonKey, s.access_token, s.user.id, "login", "auth"); }} />;
-  if (loadingCity) return <LoadingScreen city={loadingCity} />;
+  if (loadingCity) return <LoadingScreen />;
 
   const visibleTabs = TABS.filter(t => t.id !== "agentProfile");
 

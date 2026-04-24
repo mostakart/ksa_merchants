@@ -845,7 +845,8 @@ function TicketExplorerTab({ tickets, onTicketClick }) {
       if (channel !== "All" && t.channel !== channel) return false;
       if (reason !== "All" && t.reason !== reason) return false;
       if (status !== "All" && t.status !== status) return false;
-      if (happiness !== "All" && t.happiness !== happiness) return false;
+      const csatProxy = t.happiness || (["positive", "very_positive"].includes(t.finalSentiment) ? "Good" : ["negative", "very_negative", "worsened"].includes(t.finalSentiment) ? "Bad" : ["neutral", "stable"].includes(t.finalSentiment) ? "Okay" : "");
+      if (happiness !== "All" && csatProxy !== happiness) return false;
       if (slaF !== "All" && t.slaViolation !== slaF) return false;
       if (aiFilter === "Churn Risk" && !t.isChurnIntent) return false;
       if (aiFilter === "Payment Blocker" && !t.isPaymentBlocker) return false;
@@ -929,8 +930,8 @@ function TicketExplorerTab({ tickets, onTicketClick }) {
                       {t.finalSentiment ? (
                         <span style={{
                           fontSize: 10, padding: "2px 7px", borderRadius: 8,
-                          background: t.finalSentiment.includes("Positive") ? "#DCFCE7" : t.finalSentiment.includes("Negative") ? "#FEE2E2" : "#FEF3C7",
-                          color: t.finalSentiment.includes("Positive") ? "#16A34A" : t.finalSentiment.includes("Negative") ? "#DC2626" : "#D97706",
+                          background: t.finalSentiment.toLowerCase().includes("positive") ? "#DCFCE7" : t.finalSentiment.toLowerCase().includes("negative") ? "#FEE2E2" : "#FEF3C7",
+                          color: t.finalSentiment.toLowerCase().includes("positive") ? "#16A34A" : t.finalSentiment.toLowerCase().includes("negative") ? "#DC2626" : "#D97706",
                           fontWeight: 600
                         }}>{t.finalSentiment}</span>
                       ) : <span style={{ color: C.muted }}>—</span>}
@@ -943,7 +944,10 @@ function TicketExplorerTab({ tickets, onTicketClick }) {
                       ) : "—"}
                     </td>
                     <td style={{ padding: "9px 12px" }}>
-                      {t.happiness ? <span style={{ fontSize: 10, fontWeight: 600, color: HP_COLORS[t.happiness] || C.muted }}>{t.happiness}</span> : <span style={{ color: C.muted }}>—</span>}
+                      {(() => {
+                        const csatProxy = t.happiness || (["positive", "very_positive"].includes(t.finalSentiment) ? "Good" : ["negative", "very_negative", "worsened"].includes(t.finalSentiment) ? "Bad" : ["neutral", "stable"].includes(t.finalSentiment) ? "Okay" : "");
+                        return csatProxy ? <span style={{ fontSize: 10, fontWeight: 600, color: HP_COLORS[csatProxy] || C.muted }}>{csatProxy}</span> : <span style={{ color: C.muted }}>—</span>;
+                      })()}
                     </td>
                   </tr>
                 ))}

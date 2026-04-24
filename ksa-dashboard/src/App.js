@@ -296,16 +296,34 @@ function LoginScreen({ anonKey, onLogin }) {
 /* ─── LOADING SCREEN ─────────────────────────────────────────── */
 function LoadingScreen({ city }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100vh", alignItems: "center", justifyContent: "center", background: C.bg, gap: 14 }}>
-      <div style={{ display: "flex", gap: 7 }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "100vh", alignItems: "center", justifyContent: "center", background: C.bg, gap: 24, textAlign: "center", padding: 20 }}>
+      <WaffarhaLogo height={60} style={{ marginBottom: 10 }} />
+      
+      <div style={{ maxWidth: 500 }}>
+        <div style={{ fontSize: 24, fontWeight: 800, color: C.text, marginBottom: 8, letterSpacing: "-0.5px" }}>
+          Waffarha Nexus
+        </div>
+        <div style={{ fontSize: 16, color: C.sub, fontWeight: 600, marginBottom: 16 }}>
+          End-to-End Internal Portal
+        </div>
+        <div style={{ fontSize: 17, color: C.text, lineHeight: 1.6, direction: "rtl", fontWeight: 500 }}>
+          بوابتك لكل المعلومات اللي هتحتاجها ومش هتلاقيها إلا هنا...
+          <br />
+          ذكاء بيانات تجار وفرها في مكان واحد.
+        </div>
+      </div>
+
+      <div style={{ display: "flex", gap: 7, marginTop: 10 }}>
         {[0, 150, 300].map(d => (
-          <div key={d} style={{ width: 10, height: 10, borderRadius: "50%", background: C.accent, animation: "bounce .7s infinite alternate", animationDelay: `${d}ms` }} />
+          <div key={d} style={{ width: 8, height: 8, borderRadius: "50%", background: C.accent, animation: "bounce .7s infinite alternate", animationDelay: `${d}ms` }} />
         ))}
       </div>
-      <div style={{ fontSize: 13, color: C.muted }}>
-        Loading <strong style={{ color: C.text }}>{city}</strong> merchants…
+
+      <div style={{ fontSize: 12, color: C.muted, marginTop: 5 }}>
+        Loading <strong style={{ color: C.text }}>{city}</strong> data...
       </div>
-      <style>{`@keyframes bounce { to { transform:translateY(-8px);opacity:.3; } }`}</style>
+      
+      <style>{`@keyframes bounce { to { transform:translateY(-6px);opacity:.3; } }`}</style>
     </div>
   );
 }

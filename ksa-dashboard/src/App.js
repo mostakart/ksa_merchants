@@ -2207,7 +2207,7 @@ export default function App() {
       <div style={{ width: 216, background: C.white, borderRight: `1px solid ${C.border}`, display: "flex", flexDirection: "column", flexShrink: 0 }}>
         <div style={{ padding: "20px 16px 14px", borderBottom: `1px solid ${C.border}` }}>
           <WaffarhaLogo height={26} style={{ marginBottom: 6 }} />
-          <div style={{ fontSize: 11, color: C.muted, fontWeight: 500 }}>Waffarha Nexus</div>
+          <div style={{ fontSize: 18, color: C.text, fontWeight: 800, letterSpacing: "-0.5px" }}>Nexus</div>
         </div>
 
         <nav style={{ padding: "10px 8px", flex: 1, overflowY: "auto" }}>

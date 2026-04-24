@@ -339,7 +339,7 @@ function normTicket(a) {
     numReassign: parseInt(t.num_reassign) || 0,
     numReopen: parseInt(t.num_reopen) || 0,
     isOverdue: String(t.is_overdue) === "true",
-    isEscalated: String(t.is_escalated) === "true",
+    isEscalated: String(t.is_escalated) === "true" || String(a.a_escalated).toLowerCase() === "true",
     slaViolation: t.sla_violation_type || "",
     escalationValidity: t.escalation_validity || "",
     merchantName: t.merchant_name || a.p_merchant_name || "",

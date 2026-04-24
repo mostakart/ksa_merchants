@@ -304,7 +304,7 @@ function LoadingScreen() {
           Nexus
         </div>
         <div style={{ fontSize: 16, color: C.sub, fontWeight: 500, lineHeight: 1.6, maxWidth: 420, margin: "0 auto" }}>
-          The end-to-end internal portal for exclusive merchant intelligence insights you won't find anywhere else.
+          The all-in-one portal for unparalleled merchant intelligence and smarter CRM quality analysis
         </div>
       </div>
 

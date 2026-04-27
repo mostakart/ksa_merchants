@@ -1356,7 +1356,12 @@ function ProfilerTab({ merchants, anonKey, initialMerchant, tickets, region = "K
                   <span style={{ fontWeight: 500 }}>{m.Merchant}</span>
                   <div style={{ fontSize: 10, color: C.muted }}>{m.Mall} · {m.City}</div>
                 </div>
-                <span style={{ fontSize: 10, fontWeight: 500, color: m.Priority.toLowerCase().includes("high") ? C.accent : m.Priority.toLowerCase().includes("medium") ? "#D97706" : m.Priority.toLowerCase().includes("low") ? "#16A34A" : C.muted }}>
+                <span style={{ 
+                  fontSize: 10, fontWeight: 700, 
+                  color: m.Rating >= 4 ? "#16A34A" : m.Rating >= 3 ? "#D97706" : C.accent, 
+                  background: m.Rating >= 4 ? "#F0FDF4" : m.Rating >= 3 ? "#FFFBEB" : C.accentL, 
+                  padding: "2px 6px", borderRadius: 5, display: "flex", alignItems: "center", gap: 3, whiteSpace: "nowrap" 
+                }}>
                   ★ {m.Rating}
                 </span>
               </div>
@@ -1409,9 +1414,11 @@ function ProfilerTab({ merchants, anonKey, initialMerchant, tickets, region = "K
                 </div>
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8, marginBottom: 12 }}>
-                {[["Rating", `${selected.Rating} ★`], ["Reviews", selected.Reviews >= 1000 ? `${(selected.Reviews / 1000).toFixed(1)}k` : selected.Reviews], ["City Br.", selected.Branches || 1], [`${region} Br.`, selected.TotalKsaBranches || selected.Branches]].map(([l, v]) => (
-                  <div key={l} style={{ background: "#F9F8F7", borderRadius: 7, padding: "8px 6px", textAlign: "center" }}>
-                    <div style={{ fontSize: 16, fontWeight: 700 }}>{v}</div>
+                {[["Rating", selected.Rating, true], ["Reviews", selected.Reviews >= 1000 ? `${(selected.Reviews / 1000).toFixed(1)}k` : selected.Reviews], ["City Br.", selected.Branches || 1], [`${region} Br.`, selected.TotalKsaBranches || selected.Branches]].map(([l, v, isRating]) => (
+                  <div key={l} style={{ background: "#F9F8F7", borderRadius: 7, padding: "8px 6px", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+                    <div style={{ fontSize: 16, fontWeight: 700, color: isRating ? (v >= 4 ? "#16A34A" : v >= 3 ? "#D97706" : C.accent) : "inherit", display: "flex", alignItems: "center", gap: 3 }}>
+                      {v}{isRating && <span style={{ fontSize: 12 }}>★</span>}
+                    </div>
                     <div style={{ fontSize: 10, color: C.muted }}>{l}</div>
                   </div>
                 ))}
@@ -1605,7 +1612,16 @@ function PipelineTab({ merchants, onMerchantClick, statuses, onStatusChange }) {
                     <td style={{ padding: "9px 12px", fontSize: 11, color: C.muted, maxWidth: 110, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.Mall}</td>
                     <td style={{ padding: "9px 12px", fontSize: 11, color: C.sub, maxWidth: 110, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.Category === "Uncategorized" ? "—" : m.Category}</td>
                     <td style={{ padding: "9px 12px", fontWeight: 500, fontSize: 11, color: m.Priority.toLowerCase().includes("high") ? C.accent : m.Priority.toLowerCase().includes("medium") ? "#D97706" : m.Priority.toLowerCase().includes("low") ? "#16A34A" : C.muted }}>{m.Priority}</td>
-                    <td style={{ padding: "9px 12px", color: "#D97706" }}>★ {m.Rating}</td>
+                     <td style={{ padding: "9px 12px" }}>
+                       <span style={{ 
+                         fontSize: 10, fontWeight: 700, 
+                         color: m.Rating >= 4 ? "#16A34A" : m.Rating >= 3 ? "#D97706" : C.accent, 
+                         background: m.Rating >= 4 ? "#F0FDF4" : m.Rating >= 3 ? "#FFFBEB" : C.accentL, 
+                         padding: "2px 6px", borderRadius: 5, display: "inline-flex", alignItems: "center", gap: 3, whiteSpace: "nowrap" 
+                       }}>
+                         ★ {m.Rating}
+                       </span>
+                     </td>
                     <td style={{ padding: "9px 12px" }}>{m.Reviews >= 1000 ? `${(m.Reviews / 1000).toFixed(1)}k` : m.Reviews}</td>
                     <td style={{ padding: "9px 12px", color: C.muted }}>{m.AvgPrice || "—"}</td>
                     <td style={{ padding: "9px 12px", color: C.muted, fontSize: 11, maxWidth: 150, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={m.OpeningHours}>{m.OpeningHours || "—"}</td>
@@ -1680,7 +1696,12 @@ function SavedMerchantsTab({ merchants, favoriteIds, onMerchantClick }) {
                     <div style={{ fontSize: 18, fontWeight: 700, color: C.text, lineHeight: 1.3 }}>{m.Merchant}</div>
                     <div style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>{m.Mall ? `${m.Mall} · ` : ''}{m.City}</div>
                   </div>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: m.Rating >= 4 ? "#16A34A" : C.muted, background: m.Rating >= 4 ? "#F0FDF4" : "#F4F2EE", padding: "4px 8px", borderRadius: 6 }}>
+                  <span style={{ 
+                    fontSize: 12, fontWeight: 700, 
+                    color: m.Rating >= 4 ? "#16A34A" : m.Rating >= 3 ? "#D97706" : C.accent, 
+                    background: m.Rating >= 4 ? "#F0FDF4" : m.Rating >= 3 ? "#FFFBEB" : C.accentL, 
+                    padding: "4px 10px", borderRadius: 8, display: "flex", alignItems: "center", gap: 4, whiteSpace: "nowrap" 
+                  }}>
                     ★ {m.Rating}
                   </span>
                 </div>

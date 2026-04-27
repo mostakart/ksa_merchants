@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { pipeline, env } from "@xenova/transformers";
 import MerchantProfiler from "./MerchantProfiler";
+import MerchantNotes from "./MerchantNotes";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, CartesianGrid,
@@ -11,6 +12,7 @@ env.allowLocalModels = false;
 /* ─── CONFIG ─────────────────────────────────────────────────── */
 const SB_URL = process.env.REACT_APP_SUPABASE_URL || "https://omowdfzyudedrtcuhnvy.supabase.co";
 const CITIES = ["riyadh", "jeddah", "dammam", "khobar", "mecca", "medina"];
+const OMAN_CITIES = ["muscat"];
 const C = {
   accent: "#FF5A00", accentL: "#FFF0ED", bg: "#F5F2EE",
   white: "#FFFFFF", border: "#E8E4DF", text: "#1A1A1A",
@@ -111,7 +113,7 @@ const norm = m => {
     Rating: parseFloat(m.rating) || 0,
     Reviews: parseInt(m.reviews_count) || 0,
     AvgPrice: m.avg_price || "",
-    Branches: parseInt(m.branches_ksa) || 0,
+    Branches: Math.max(1, parseInt(m.branches_ksa) || 0),
     Phone: m.phone || "",
     Website: m.website || "",
     Reviews3: m.top_reviews || "",
@@ -167,11 +169,31 @@ function computeTopMalls(merchants, n = 8) {
 }
 
 /* ─── SMALL UI COMPONENTS ────────────────────────────────────── */
-function KPI({ label, value, sub, color }) {
+function KPI({ label, value, sub, color, onClick }) {
+  const accent = color || C.accent;
   return (
-    <div style={{ background: C.white, borderRadius: 10, padding: "14px 16px", border: `1px solid ${C.border}` }}>
+    <div onClick={onClick} 
+      style={{ 
+        background: C.white, borderRadius: 10, padding: "14px 16px", border: `1px solid ${C.border}`,
+        cursor: onClick ? "pointer" : "default",
+        transition: "all .12s",
+        boxShadow: "none"
+      }}
+      onMouseEnter={e => {
+        if (onClick) {
+          e.currentTarget.style.borderColor = accent;
+          e.currentTarget.style.boxShadow = `0 2px 12px ${accent}22`;
+        }
+      }}
+      onMouseLeave={e => {
+        if (onClick) {
+          e.currentTarget.style.borderColor = C.border;
+          e.currentTarget.style.boxShadow = "none";
+        }
+      }}
+    >
       <div style={{ fontSize: 10, color: C.muted, textTransform: "uppercase", letterSpacing: .5 }}>{label}</div>
-      <div style={{ fontSize: 22, fontWeight: 700, color: color || C.text, letterSpacing: "-.5px", margin: "4px 0 2px" }}>{value}</div>
+      <div style={{ fontSize: 22, fontWeight: 700, color: accent, letterSpacing: "-.5px", margin: "4px 0 2px" }}>{value}</div>
       {sub && <div style={{ fontSize: 11, color: C.muted }}>{sub}</div>}
     </div>
   );
@@ -325,6 +347,7 @@ function normTicket(a) {
   const cleanHtml = s => (s || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
   return {
     id: a.id,
+    ticket_number: a.ticket_number,
     subject: cleanHtml(t.subject) || "—",
     status: t.status || a.ai_status || "Closed",
     channel: t.channel || "Other",
@@ -683,6 +706,7 @@ function SupportTab({ tickets }) {
 function AgentsTab({ tickets, onAgentClick }) {
   const [sortBy, setSortBy] = useState("tickets");
   const [page, setPage] = useState(1);
+  const [searchQ, setSearchQ] = useState("");
   const pageSize = 12;
 
 
@@ -721,13 +745,17 @@ function AgentsTab({ tickets, onAgentClick }) {
     }));
   }, [tickets, agentMap]);
 
-  const sorted = useMemo(() => [...agentStats].sort((a, b) => {
-    if (sortBy === "tickets") return b.tickets - a.tickets;
-    if (sortBy === "csat") return (b.csat ?? -1) - (a.csat ?? -1);
-    if (sortBy === "sla") return (b.slaRate ?? -1) - (a.slaRate ?? -1);
-    if (sortBy === "resolution") return parseFloat(a.avgRes ?? 9999) - parseFloat(b.avgRes ?? 9999);
-    return 0;
-  }), [agentStats, sortBy]);
+  const sorted = useMemo(() => {
+    const q = searchQ.toLowerCase();
+    const filtered = agentStats.filter(a => !q || a.name.toLowerCase().includes(q));
+    return filtered.sort((a, b) => {
+      if (sortBy === "tickets") return b.tickets - a.tickets;
+      if (sortBy === "csat") return (b.csat ?? -1) - (a.csat ?? -1);
+      if (sortBy === "sla") return (b.slaRate ?? -1) - (a.slaRate ?? -1);
+      if (sortBy === "resolution") return parseFloat(a.avgRes ?? 9999) - parseFloat(b.avgRes ?? 9999);
+      return 0;
+    });
+  }, [agentStats, sortBy, searchQ]);
 
   const totalPages = Math.ceil(sorted.length / pageSize);
   const paginated = sorted.slice((page - 1) * pageSize, page * pageSize);
@@ -761,13 +789,22 @@ function AgentsTab({ tickets, onAgentClick }) {
         })()}
       </div>
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-        {[["tickets", "By Tickets"], ["csat", "By CSAT"], ["sla", "By SLA %"], ["resolution", "By Fastest Res."]].map(([val, label]) => (
-          <button key={val} onClick={() => setSortBy(val)}
-            style={{ padding: "6px 14px", borderRadius: 6, border: `1px solid ${sortBy === val ? C.accent : C.border}`, background: sortBy === val ? C.accentL : C.white, color: sortBy === val ? C.accent : C.sub, fontSize: 11, cursor: "pointer", fontWeight: sortBy === val ? 600 : 400 }}>
-            {label}
-          </button>
-        ))}
+      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 16 }}>
+        <div style={{ display: "flex", gap: 8 }}>
+          {[["tickets", "By Tickets"], ["csat", "By CSAT"], ["sla", "By SLA %"], ["resolution", "By Fastest Res."]].map(([val, label]) => (
+            <button key={val} onClick={() => setSortBy(val)}
+              style={{ padding: "6px 14px", borderRadius: 6, border: `1px solid ${sortBy === val ? C.accent : C.border}`, background: sortBy === val ? C.accentL : C.white, color: sortBy === val ? C.accent : C.sub, fontSize: 11, cursor: "pointer", fontWeight: sortBy === val ? 600 : 400 }}>
+              {label}
+            </button>
+          ))}
+        </div>
+        <div style={{ position: "relative" }}>
+          <input value={searchQ} onChange={e => setSearchQ(e.target.value)} placeholder="Search agent name..."
+            style={{ width: 220, padding: "8px 10px 8px 30px", border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 12, outline: "none", background: C.white }} />
+          <svg style={{ position: "absolute", left: 9, top: "50%", transform: "translateY(-50%)" }} width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={C.muted} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
+          </svg>
+        </div>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(195px,1fr))", gap: 10, alignContent: "start" }}>
@@ -822,18 +859,20 @@ function AgentsTab({ tickets, onAgentClick }) {
 }
 
 /* ─── TICKET EXPLORER TAB ────────────────────────────────────── */
-function TicketExplorerTab({ tickets, onTicketClick }) {
-  const [channel, setChannel] = useState("All");
-  const [reason, setReason] = useState("All");
-  const [status, setStatus] = useState("All");
-  const [happiness, setHappiness] = useState("All");
-  const [slaF, setSlaF] = useState("All");
-  const [aiFilter, setAiFilter] = useState("All");
-  const [q, setQ] = useState("");
+function TicketExplorerTab({ tickets, onTicketClick, initialFilters = {} }) {
+  const [agent, setAgent] = useState(initialFilters.agent || "All");
+  const [channel, setChannel] = useState(initialFilters.channel || "All");
+  const [reason, setReason] = useState(initialFilters.reason || "All");
+  const [status, setStatus] = useState(initialFilters.status || "All");
+  const [happiness, setHappiness] = useState(initialFilters.happiness || "All");
+  const [slaF, setSlaF] = useState(initialFilters.slaF || "All");
+  const [aiFilter, setAiFilter] = useState(initialFilters.aiFilter || "All");
+  const [q, setQ] = useState(initialFilters.q || "");
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState(null);
   const PAGE = 50;
 
+  const agents = useMemo(() => ["All", ...new Set(tickets.map(t => t.owner).filter(Boolean)).values()].sort(), [tickets]);
   const channels = useMemo(() => ["All", ...new Set(tickets.map(t => t.channel).filter(Boolean)).values()].sort(), [tickets]);
   const reasons = useMemo(() => ["All", ...new Set(tickets.map(t => t.reason).filter(Boolean)).values()].sort(), [tickets]);
   const slaOpts = ["All", "Not Violated", "Resolution Violation"];
@@ -842,6 +881,7 @@ function TicketExplorerTab({ tickets, onTicketClick }) {
   const filtered = useMemo(() => {
     const qL = q.toLowerCase();
     return tickets.filter(t => {
+      if (agent !== "All" && t.owner !== agent) return false;
       if (channel !== "All" && t.channel !== channel) return false;
       if (reason !== "All" && t.reason !== reason) return false;
       if (status !== "All" && t.status !== status) return false;
@@ -853,14 +893,14 @@ function TicketExplorerTab({ tickets, onTicketClick }) {
       if (aiFilter === "Fraud Suspicion" && !t.fraudSuspicion) return false;
       if (aiFilter === "Refund Requested" && !t.isRefundRequested) return false;
       if (aiFilter === "Escalated by AI" && !t.isEscalatedAI) return false;
-      if (q && !t.subject.toLowerCase().includes(qL) && !t.merchantName.toLowerCase().includes(qL) && !t.subReason.toLowerCase().includes(qL) && !t.reason.toLowerCase().includes(qL)) return false;
+      if (q && !t.subject.toLowerCase().includes(qL) && !t.merchantName.toLowerCase().includes(qL) && !t.subReason.toLowerCase().includes(qL) && !t.reason.toLowerCase().includes(qL) && !(t.ticket_number && t.ticket_number.toLowerCase().includes(qL)) && !String(t.id).includes(qL)) return false;
       return true;
     }).sort((a, b) => b.createdTime.localeCompare(a.createdTime));
   }, [tickets, channel, reason, status, happiness, slaF, aiFilter, q]);
 
   const totalPages = Math.ceil(filtered.length / PAGE);
   const pageRows = filtered.slice((page - 1) * PAGE, page * PAGE);
-  useEffect(() => setPage(1), [channel, reason, status, happiness, slaF, q]);
+  useEffect(() => setPage(1), [agent, channel, reason, status, happiness, slaF, aiFilter, q]);
 
   const thStyle = { padding: "10px 12px", textAlign: "left", fontSize: 10, color: C.muted, textTransform: "uppercase", letterSpacing: .5, fontWeight: 500, whiteSpace: "nowrap" };
 
@@ -879,7 +919,7 @@ function TicketExplorerTab({ tickets, onTicketClick }) {
             <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
           </svg>
         </div>
-        {[["Channel", channels, channel, setChannel], ["Reason", reasons.slice(0, 30), reason, setReason],
+        {[["Agent", agents, agent, setAgent], ["Channel", channels, channel, setChannel], ["Reason", reasons.slice(0, 30), reason, setReason],
           ["Status", ["All", "Open", "Closed", "Resolved"], status, setStatus],
           ["AI Signal", aiOpts, aiFilter, setAiFilter],
           ["CSAT", ["All", "Good", "Okay", "Bad"], happiness, setHappiness],
@@ -891,7 +931,7 @@ function TicketExplorerTab({ tickets, onTicketClick }) {
             {opts.filter(o => o !== "All").map(o => <option key={o}>{o}</option>)}
           </select>
         ))}
-        <button onClick={() => { setChannel("All"); setReason("All"); setStatus("All"); setHappiness("All"); setSlaF("All"); setAiFilter("All"); setQ(""); }}
+        <button onClick={() => { setAgent("All"); setChannel("All"); setReason("All"); setStatus("All"); setHappiness("All"); setSlaF("All"); setAiFilter("All"); setQ(""); }}
           style={{ padding: "8px 12px", background: "#F4F2EE", border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 11, color: C.muted, cursor: "pointer" }}>
           Reset
         </button>
@@ -917,7 +957,7 @@ function TicketExplorerTab({ tickets, onTicketClick }) {
                     <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>
                       <span onClick={e => { e.stopPropagation(); onTicketClick && onTicketClick(t.id); }}
                         style={{ color: C.accent, cursor: "pointer", fontWeight: 600, fontSize: 11 }}>
-                        #{t.id}
+                        {t.ticket_number || t.id}
                       </span>
                     </td>
                     <td style={{ padding: "9px 12px", color: C.muted, whiteSpace: "nowrap", fontSize: 11 }}>{(t.createdTime || "").slice(0, 10)}</td>
@@ -978,7 +1018,7 @@ function TicketExplorerTab({ tickets, onTicketClick }) {
         {selected && (
           <Card style={{ alignSelf: "start", fontSize: 12, position: "sticky", top: 0 }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
-              <div style={{ fontSize: 14, fontWeight: 700 }}>Ticket #{selected.id}</div>
+              <div style={{ fontSize: 14, fontWeight: 700 }}>Ticket {selected.ticket_number || selected.id}</div>
               <button onClick={() => setSelected(null)} style={{ background: "none", border: "none", color: C.muted, cursor: "pointer", fontSize: 20, lineHeight: 1 }}>×</button>
             </div>
             {selected.sentimentSummary && (
@@ -1048,7 +1088,7 @@ function TicketExplorerTab({ tickets, onTicketClick }) {
 }
 
 /* ─── MACRO TAB ──────────────────────────────────────────────── */
-function MacroTab({ merchants }) {
+function MacroTab({ merchants, region = "KSA" }) {
   const cityStats = useMemo(() => computeCityStats(merchants), [merchants]);
   const priceTiers = useMemo(() => computePriceTiers(merchants), [merchants]);
   const topMalls = useMemo(() => computeTopMalls(merchants), [merchants]);
@@ -1070,14 +1110,14 @@ function MacroTab({ merchants }) {
   return (
     <div>
       <div style={{ marginBottom: 20 }}>
-        <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: "-.4px" }}>KSA Market Intelligence</div>
+        <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: "-.4px" }}>{region} Market Intelligence</div>
         <div style={{ fontSize: 13, color: C.muted, marginTop: 3 }}>
           {Object.keys(cityStats).length} cities · {mallsN} malls · {total.toLocaleString()} merchants
         </div>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(6,1fr)", gap: 10, marginBottom: 18 }}>
-        <KPI label="Total Merchants" value={total.toLocaleString()} sub="Full KSA coverage" />
+        <KPI label="Total Merchants" value={total.toLocaleString()} sub={`Full ${region} coverage`} />
         <KPI label="High Priority" value={high.toLocaleString()} sub={`${(high / total * 100 || 0).toFixed(1)}% of market`} color={C.accent} />
         <KPI label="Medium Priority" value={medium.toLocaleString()} sub={`${(medium / total * 100 || 0).toFixed(1)}% of market`} color="#D97706" />
         <KPI label="Avg Rating" value={`${avgR.toFixed(2)} ★`} sub="Market benchmark" color="#16A34A" />
@@ -1184,7 +1224,7 @@ function MacroTab({ merchants }) {
 }
 
 /* ─── PROFILER TAB ───────────────────────────────────────────── */
-function ProfilerTab({ merchants, anonKey, initialMerchant, tickets }) {
+function ProfilerTab({ merchants, anonKey, initialMerchant, tickets, region = "KSA", userEmail, favoriteIds, toggleFavorite }) {
   const [query, setQuery] = useState(initialMerchant ? initialMerchant.Merchant : "");
   const [selected, setSelected] = useState(initialMerchant || null);
   const [showList, setShowList] = useState(false);
@@ -1326,50 +1366,85 @@ function ProfilerTab({ merchants, anonKey, initialMerchant, tickets }) {
       </div>
 
       {selected ? (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1.2fr", gap: 16 }}>
-          <Card>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
-              <div style={{ textAlign: "right", flex: 1 }}>
-                <div style={{ fontSize: 16, fontWeight: 700, direction: "rtl", lineHeight: 1.4 }}>{selected.Merchant}</div>
-                <div style={{ fontSize: 11, color: C.muted, marginTop: 3, direction: "rtl" }}>{selected.Mall} · {selected.City}</div>
-              </div>
-              <span style={{
-                marginLeft: 10, padding: "3px 9px", borderRadius: 5, fontSize: 10, fontWeight: 500, flexShrink: 0,
-                background: selected.Priority.toLowerCase().includes("high") ? C.accentL : selected.Priority.toLowerCase().includes("medium") ? "#FEF3C7" : selected.Priority.toLowerCase().includes("low") ? "#F0FDF4" : "#F4F2EE",
-                color: selected.Priority.toLowerCase().includes("high") ? C.accent : selected.Priority.toLowerCase().includes("medium") ? "#D97706" : selected.Priority.toLowerCase().includes("low") ? "#16A34A" : C.muted
-              }}>
-                {selected.Priority}
-              </span>
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8, marginBottom: 12 }}>
-              {[["Rating", `${selected.Rating} ★`], ["Reviews", selected.Reviews >= 1000 ? `${(selected.Reviews / 1000).toFixed(1)}k` : selected.Reviews], ["City Br.", selected.Branches || 1], ["KSA Br.", selected.TotalKsaBranches]].map(([l, v]) => (
-                <div key={l} style={{ background: "#F9F8F7", borderRadius: 7, padding: "8px 6px", textAlign: "center" }}>
-                  <div style={{ fontSize: 16, fontWeight: 700 }}>{v}</div>
-                  <div style={{ fontSize: 10, color: C.muted }}>{l}</div>
+        <>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1.2fr", gap: 16 }}>
+            <Card>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+                <div style={{ textAlign: "right", flex: 1 }}>
+                  <div style={{ fontSize: 16, fontWeight: 700, direction: "rtl", lineHeight: 1.4 }}>{selected.Merchant}</div>
+                  <div style={{ fontSize: 11, color: C.muted, marginTop: 3, direction: "rtl" }}>{selected.Mall} · {selected.City}</div>
                 </div>
-              ))}
-            </div>
-            <div style={{ fontSize: 12, color: C.sub, lineHeight: 2 }}>
-              {selected.Category && selected.Category !== "Uncategorized" && <div>🏷️ {selected.Category}</div>}
-              {selected.AvgPrice && <div>💰 {selected.AvgPrice}</div>}
-              {selected.OpeningHours && <div>⏰ {selected.OpeningHours}</div>}
-              {selected.Phone && <div>📞 {selected.Phone}</div>}
-            </div>
-            {selected.Reviews3 && (
-              <div style={{ marginTop: 10, padding: 10, background: "#F9F8F7", borderRadius: 7, maxHeight: 150, overflowY: "auto" }}>
-                <div style={{ fontSize: 10, color: C.muted, fontWeight: 500, marginBottom: 5 }}>ALL REVIEWS</div>
-                <div style={{ fontSize: 11, color: C.sub, lineHeight: 1.7, direction: "rtl", textAlign: "right" }}>
-                  {selected.Reviews3.split("|").map((rev, i) => (
-                    rev.trim() ? <div key={i} style={{ marginBottom: 6, paddingBottom: 6, borderBottom: i < selected.Reviews3.split("|").length - 1 ? "1px solid #EAEAEA" : "none" }}>{rev.trim()}</div> : null
-                  ))}
+                <div style={{ display: "flex", alignItems: "center", gap: 12, marginLeft: 16 }}>
+                  {favoriteIds && toggleFavorite && (
+                    <button 
+                      onClick={() => toggleFavorite(selected.Merchant)}
+                      style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 18, padding: 0, outline: 'none', transition: 'transform 0.1s' }}
+                      onMouseDown={e => e.currentTarget.style.transform = 'scale(0.9)'}
+                      onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'}
+                      onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                      title={favoriteIds.has(selected.Merchant) ? "Remove from Favorites" : "Add to Favorites"}
+                    >
+                      {favoriteIds.has(selected.Merchant) ? '❤️' : '🤍'}
+                    </button>
+                  )}
+                  <button 
+                    onClick={() => {
+                      const text = `🏢 Merchant: ${selected.Merchant}\n📍 Location: ${selected.Mall ? selected.Mall + ', ' : ''}${selected.City}\n⭐ Rating: ${selected.Rating} ★ (${selected.Reviews} reviews)\n🏷️ Category: ${selected.Category}\n\nView details in Waffarha Nexus`;
+                      navigator.clipboard.writeText(text);
+                      alert("Merchant details copied to clipboard!");
+                    }}
+                    style={{ background: '#F3F4F6', border: '1px solid #E5E7EB', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 600, padding: '4px 10px', color: '#4B5563', display: 'flex', alignItems: 'center', gap: 6 }}
+                    title="Share Merchant"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+                    Share
+                  </button>
+                  <span style={{
+                    padding: "3px 9px", borderRadius: 5, fontSize: 10, fontWeight: 500, flexShrink: 0,
+                    background: selected.Priority.toLowerCase().includes("high") ? C.accentL : selected.Priority.toLowerCase().includes("medium") ? "#FEF3C7" : selected.Priority.toLowerCase().includes("low") ? "#F0FDF4" : "#F4F2EE",
+                    color: selected.Priority.toLowerCase().includes("high") ? C.accent : selected.Priority.toLowerCase().includes("medium") ? "#D97706" : selected.Priority.toLowerCase().includes("low") ? "#16A34A" : C.muted
+                  }}>
+                    {selected.Priority}
+                  </span>
                 </div>
               </div>
-            )}
-          </Card>
-          <Card style={{ padding: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
-            <MerchantProfiler initialMerchant={selected} embedded={true} tickets={tickets} />
-          </Card>
-        </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8, marginBottom: 12 }}>
+                {[["Rating", `${selected.Rating} ★`], ["Reviews", selected.Reviews >= 1000 ? `${(selected.Reviews / 1000).toFixed(1)}k` : selected.Reviews], ["City Br.", selected.Branches || 1], [`${region} Br.`, selected.TotalKsaBranches || selected.Branches]].map(([l, v]) => (
+                  <div key={l} style={{ background: "#F9F8F7", borderRadius: 7, padding: "8px 6px", textAlign: "center" }}>
+                    <div style={{ fontSize: 16, fontWeight: 700 }}>{v}</div>
+                    <div style={{ fontSize: 10, color: C.muted }}>{l}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ fontSize: 12, color: C.sub, lineHeight: 2 }}>
+                {selected.Category && selected.Category !== "Uncategorized" && <div>🏷️ {selected.Category}</div>}
+                {selected.AvgPrice && <div>💰 {selected.AvgPrice}</div>}
+                {selected.OpeningHours && <div>⏰ {selected.OpeningHours}</div>}
+                {selected.Phone && <div>📞 {selected.Phone}</div>}
+              </div>
+              {selected.Reviews3 && (
+                <div style={{ marginTop: 10, padding: 10, background: "#F9F8F7", borderRadius: 7, maxHeight: 150, overflowY: "auto" }}>
+                  <div style={{ fontSize: 10, color: C.muted, fontWeight: 500, marginBottom: 5 }}>ALL REVIEWS</div>
+                  <div style={{ fontSize: 11, color: C.sub, lineHeight: 1.7, direction: "rtl", textAlign: "right" }}>
+                    {selected.Reviews3.split("|").map((rev, i) => (
+                      rev.trim() ? <div key={i} style={{ marginBottom: 6, paddingBottom: 6, borderBottom: i < selected.Reviews3.split("|").length - 1 ? "1px solid #EAEAEA" : "none" }}>{rev.trim()}</div> : null
+                    ))}
+                  </div>
+                </div>
+              )}
+            </Card>
+            <Card style={{ padding: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+              <MerchantProfiler initialMerchant={selected} embedded={true} tickets={tickets} />
+            </Card>
+          </div>
+          <div style={{ marginTop: 16 }}>
+            <MerchantNotes 
+              merchantId={selected.Merchant} 
+              authorName={userEmail || localStorage.getItem("wn_email") || "Team Member"} 
+              anonKey={anonKey} 
+            />
+          </div>
+        </>
       ) : (
         <div style={{ textAlign: "center", padding: 60, color: C.muted, fontSize: 13 }}>
           Search and select a merchant to view AI analysis
@@ -1389,6 +1464,7 @@ function PipelineTab({ merchants, onMerchantClick, statuses, onStatusChange }) {
   const [subCat, setSubCat] = useState("All");
   const [price, setPrice] = useState("All");
   const [hours, setHours] = useState("All");
+  const [statusFilter, setStatusFilter] = useState("All");
   const [page, setPage] = useState(1);
   const pageSize = 50;
 
@@ -1414,11 +1490,21 @@ function PipelineTab({ merchants, onMerchantClick, statuses, onStatusChange }) {
     if (subCat !== "All" && m.SubCategory !== subCat) return false;
     if (price !== "All" && m.AvgPrice !== price) return false;
     if (hours !== "All" && m.HoursCategory !== hours) return false;
+    
+    if (statusFilter !== "All") {
+      const key = `${m.Merchant}|${m.Mall || ""}`;
+      const st = statuses[key] || "Uncontacted";
+      if (statusFilter === "Contacted+") {
+        if (st === "Uncontacted") return false;
+      } else {
+        if (st !== statusFilter) return false;
+      }
+    }
     return true;
-  }), [merchants, city, mall, prio, cat, subCat, price, hours]);
+  }), [merchants, city, mall, prio, cat, subCat, price, hours, statusFilter, statuses]);
 
   const totalPages = Math.ceil(filteredMerchants.length / pageSize);
-  useEffect(() => { setPage(1); }, [city, prio, cat, subCat, price, hours]);
+  useEffect(() => { setPage(1); }, [city, prio, cat, subCat, price, hours, statusFilter]);
   const rows = useMemo(() => filteredMerchants.slice((page - 1) * pageSize, page * pageSize), [filteredMerchants, page]);
 
   const pCounts = useMemo(() => {
@@ -1446,17 +1532,17 @@ function PipelineTab({ merchants, onMerchantClick, statuses, onStatusChange }) {
   return (
     <div>
       <div style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: "-.4px" }}>BD Pipeline</div>
+        <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: "-.4px" }}>Merchant Pipeline</div>
         <div style={{ fontSize: 13, color: C.muted, marginTop: 3 }}>Track outreach across {merchants.length.toLocaleString()} merchants</div>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(6,1fr)", gap: 10, marginBottom: 16 }}>
         <KPI label="Total Matches" value={filteredMerchants.length.toLocaleString()} sub="Based on filters" />
-        <KPI label="High" value={pCounts.h.toLocaleString()} sub="Priority" color={C.accent} />
-        <KPI label="Medium" value={pCounts.m.toLocaleString()} sub="Priority" color="#D97706" />
-        <KPI label="Low" value={pCounts.l.toLocaleString()} sub="Priority" color="#16A34A" />
-        <KPI label="Contacted" value={contacted} sub="This session" color="#1D4ED8" />
-        <KPI label="Closed Deals" value={closed} sub="This session" color="#15803D" />
+        <KPI label="High" value={pCounts.h.toLocaleString()} sub="Priority" color={C.accent} onClick={() => setPrio("High")} />
+        <KPI label="Medium" value={pCounts.m.toLocaleString()} sub="Priority" color="#D97706" onClick={() => setPrio("Medium")} />
+        <KPI label="Low" value={pCounts.l.toLocaleString()} sub="Priority" color="#16A34A" onClick={() => setPrio("Low")} />
+        <KPI label="Contacted" value={contacted} sub="This session" color="#1D4ED8" onClick={() => setStatusFilter("Contacted+")} />
+        <KPI label="Closed Deals" value={closed} sub="This session" color="#15803D" onClick={() => setStatusFilter("Closed Deal")} />
       </div>
 
       <div style={{ display: "flex", gap: 14, marginBottom: 20, alignItems: "flex-end", flexWrap: "wrap" }}>
@@ -1468,6 +1554,7 @@ function PipelineTab({ merchants, onMerchantClick, statuses, onStatusChange }) {
           { label: "Sub-category", icon: "M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01", opts: allSubCategories, val: subCat, fn: setSubCat },
           { label: "Price", icon: "M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6", opts: allPrices, val: price, fn: setPrice },
           { label: "Hours", icon: "M12 22a10 10 0 100-20 10 10 0 000 20z M12 6v6l4 2", opts: allHours, val: hours, fn: setHours },
+          { label: "Status", icon: "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z", opts: ["All", "Contacted+", "Uncontacted", "Contacted", "In Progress", "Closed Deal"], val: statusFilter, fn: setStatusFilter },
         ].map(({ label, icon, opts, val, fn, placeholder }) => (
           <div key={label} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             <label style={{ fontSize: 11, fontWeight: 600, color: C.muted, display: "flex", alignItems: "center", gap: 4, marginLeft: 2 }}>
@@ -1481,13 +1568,13 @@ function PipelineTab({ merchants, onMerchantClick, statuses, onStatusChange }) {
             <select value={val} onChange={e => fn(e.target.value)}
               style={{ padding: "8px 12px", border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 13, background: C.white, color: C.text, outline: "none", cursor: "pointer", minWidth: 140, boxShadow: "0 1px 2px rgba(0,0,0,0.05)" }}>
               {opts.map((o, i) => (
-                <option key={i} value={o}>{o === "All" ? (placeholder || `${label}: All`) : (o.length > 25 ? o.substring(0, 25) + "..." : o)}</option>
+                <option key={i} value={o}>{o === "All" ? (placeholder || `${label}: All`) : (o === "Contacted+" ? "Any Contacted" : (o.length > 25 ? o.substring(0, 25) + "..." : o))}</option>
               ))}
             </select>
           </div>
         ))}
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <button onClick={() => { setCity("All"); setMall("All"); setPrio("All"); setCat("All"); setSubCat("All"); setPrice("All"); setHours("All"); }}
+          <button onClick={() => { setCity("All"); setMall("All"); setPrio("All"); setCat("All"); setSubCat("All"); setPrice("All"); setHours("All"); setStatusFilter("All"); }}
             style={{ padding: "8px 14px", background: "#F4F2EE", border: "none", borderRadius: 8, fontSize: 12, color: C.text, cursor: "pointer", fontWeight: 600, height: 35 }}>
             Clear Filters
           </button>
@@ -1559,9 +1646,81 @@ function PipelineTab({ merchants, onMerchantClick, statuses, onStatusChange }) {
     </div>
   );
 }
+/* ─── SAVED MERCHANTS TAB ──────────────────────────────────────── */
+function SavedMerchantsTab({ merchants, favoriteIds, onMerchantClick }) {
+  const savedMerchants = useMemo(() => {
+    if (!favoriteIds || favoriteIds.size === 0) return [];
+    return merchants.filter(m => favoriteIds.has(m.Merchant));
+  }, [merchants, favoriteIds]);
+
+  return (
+    <div>
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ fontSize: 24, fontWeight: 800, letterSpacing: "-.5px", color: C.text }}>Saved Merchants ❤️</div>
+        <div style={{ fontSize: 13, color: C.muted, marginTop: 4 }}>
+          {savedMerchants.length} {savedMerchants.length === 1 ? 'merchant' : 'merchants'} in your personal favorites
+        </div>
+      </div>
+
+      {savedMerchants.length === 0 ? (
+        <div style={{ textAlign: "center", padding: 60, color: C.muted, fontSize: 14, background: C.white, borderRadius: 12, border: `1px dashed ${C.border}` }}>
+          You haven't saved any merchants yet. Go to the Profiler and click the ❤️ icon to save them here!
+        </div>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 16 }}>
+          {savedMerchants.map((m, i) => (
+            <Card key={i} style={{ padding: 20, cursor: "pointer", transition: "transform 0.2s, box-shadow 0.2s" }} >
+              <div 
+                onClick={() => onMerchantClick(m)}
+                onMouseEnter={e => { e.currentTarget.parentElement.style.transform = "translateY(-4px)"; e.currentTarget.parentElement.style.boxShadow = "0 10px 25px rgba(0,0,0,0.05)"; }}
+                onMouseLeave={e => { e.currentTarget.parentElement.style.transform = "translateY(0)"; e.currentTarget.parentElement.style.boxShadow = "none"; }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+                  <div>
+                    <div style={{ fontSize: 18, fontWeight: 700, color: C.text, lineHeight: 1.3 }}>{m.Merchant}</div>
+                    <div style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>{m.Mall ? `${m.Mall} · ` : ''}{m.City}</div>
+                  </div>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: m.Rating >= 4 ? "#16A34A" : C.muted, background: m.Rating >= 4 ? "#F0FDF4" : "#F4F2EE", padding: "4px 8px", borderRadius: 6 }}>
+                    ★ {m.Rating}
+                  </span>
+                </div>
+                
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16, marginTop: 16 }}>
+                  <div style={{ background: C.bg, padding: "8px 12px", borderRadius: 8 }}>
+                    <div style={{ fontSize: 10, color: C.muted, textTransform: "uppercase", letterSpacing: 0.5 }}>Reviews</div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>{m.Reviews.toLocaleString()}</div>
+                  </div>
+                  <div style={{ background: C.bg, padding: "8px 12px", borderRadius: 8 }}>
+                    <div style={{ fontSize: 10, color: C.muted, textTransform: "uppercase", letterSpacing: 0.5 }}>Category</div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.Category}</div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <span style={{
+                    padding: "4px 10px", borderRadius: 6, fontSize: 11, fontWeight: 500,
+                    background: m.Priority.toLowerCase().includes("high") ? C.accentL : m.Priority.toLowerCase().includes("medium") ? "#FEF3C7" : m.Priority.toLowerCase().includes("low") ? "#F0FDF4" : "#F4F2EE",
+                    color: m.Priority.toLowerCase().includes("high") ? C.accent : m.Priority.toLowerCase().includes("medium") ? "#D97706" : m.Priority.toLowerCase().includes("low") ? "#16A34A" : C.muted
+                  }}>
+                    {m.Priority} Priority
+                  </span>
+                  {m.Branches > 1 && (
+                    <span style={{ padding: "4px 10px", borderRadius: 6, fontSize: 11, fontWeight: 500, background: '#F3F4F6', color: '#4B5563' }}>
+                      {m.Branches} Branches
+                    </span>
+                  )}
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 /* ─── MALLS PROFILE TAB ──────────────────────────────────────── */
-function MallsTab({ merchants, onMerchantClick, statuses, onStatusChange }) {
+function MallsTab({ merchants, onMerchantClick, statuses, onStatusChange, region = "KSA" }) {
   const [cityFilter, setCityFilter] = useState("All");
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState("merchants");
@@ -1680,7 +1839,7 @@ function MallsTab({ merchants, onMerchantClick, statuses, onStatusChange }) {
     <div>
       <div style={{ marginBottom: 20 }}>
         <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: "-.4px" }}>Malls Profile</div>
-        <div style={{ fontSize: 13, color: C.muted, marginTop: 3 }}>{filtered.length} malls · {merchants.filter(m => m.Mall).length.toLocaleString()} merchants across KSA</div>
+        <div style={{ fontSize: 13, color: C.muted, marginTop: 3 }}>{filtered.length} malls · {merchants.filter(m => m.Mall).length.toLocaleString()} merchants across {region}</div>
       </div>
       <div style={{ display: "flex", gap: 12, marginBottom: 20, alignItems: "center", flexWrap: "wrap" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
@@ -1826,7 +1985,7 @@ function ChatBubble({ msg }) {
   );
 }
 
-function ChatReview({ tickets, initialTicketId }) {
+function ChatReview({ tickets, initialTicketId, onAgentClick }) {
   const [selectedId, setSelectedId] = useState(initialTicketId || null);
   const [searchQ, setSearchQ] = useState("");
   const [page, setPage] = useState(1);
@@ -1836,7 +1995,7 @@ function ChatReview({ tickets, initialTicketId }) {
   const filteredList = useMemo(() => {
     const q = searchQ.toLowerCase();
     return tickets.filter(t =>
-      !q || String(t.id).includes(q) || t.subject.toLowerCase().includes(q) ||
+      !q || String(t.id).includes(q) || (t.ticket_number && t.ticket_number.toLowerCase().includes(q)) || t.subject.toLowerCase().includes(q) ||
       t.owner.toLowerCase().includes(q) || t.reason.toLowerCase().includes(q)
     ).sort((a, b) => b.createdTime.localeCompare(a.createdTime));
   }, [tickets, searchQ]);
@@ -1874,7 +2033,7 @@ function ChatReview({ tickets, initialTicketId }) {
             <div key={t.id} onClick={() => setSelectedId(t.id)}
               style={{ padding: "12px 16px", cursor: "pointer", borderBottom: `1px solid #F4F2EE`, background: selectedId === t.id ? C.accentL : "transparent", borderLeft: selectedId === t.id ? `3px solid ${C.accent}` : "3px solid transparent", transition: "all .1s" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: C.text }}>#{t.id}</div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: C.text }}>{t.ticket_number || t.id}</div>
                 {t.happiness && (
                   <span style={{ fontSize: 10, fontWeight: 600, padding: "1px 6px", borderRadius: 10, background: t.happiness === "Good" ? "#DCFCE7" : t.happiness === "Bad" ? "#FEE2E2" : "#FEF3C7", color: t.happiness === "Good" ? "#16A34A" : t.happiness === "Bad" ? "#DC2626" : "#D97706" }}>
                     {t.happiness}
@@ -1908,8 +2067,11 @@ function ChatReview({ tickets, initialTicketId }) {
           {/* Header */}
           <div style={{ padding: "14px 20px", borderBottom: `1px solid ${C.border}`, background: "linear-gradient(to right, #F9F8F7, #FFFFFF)", display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
             <div>
-              <div style={{ fontSize: 14, fontWeight: 700 }}>Ticket #{selected.id}</div>
-              <div style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>{selected.owner || "Unknown Agent"} · {selected.channel}</div>
+              <div style={{ fontSize: 14, fontWeight: 700 }}>Ticket {selected.ticket_number || selected.id}</div>
+              <div style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>
+                <span onClick={() => onAgentClick && selected.owner && onAgentClick(selected.owner)} style={{ cursor: selected.owner ? "pointer" : "default", color: selected.owner ? C.accent : C.muted, fontWeight: selected.owner ? 600 : 400 }}>{selected.owner || "Unknown Agent"}</span>
+                <span style={{ color: C.muted }}> · {selected.channel}</span>
+              </div>
             </div>
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
               {selected.overallQualityScore > 0 && (
@@ -1971,7 +2133,7 @@ function ChatReview({ tickets, initialTicketId }) {
 }
 
 /* ─── AGENT PROFILE ──────────────────────────────────────────── */
-function AgentProfile({ agentId, tickets, onBack, onTicketClick }) {
+function AgentProfile({ agentId, tickets, onBack, onTicketClick, onKPIFilter }) {
   const agentTickets = useMemo(() => tickets.filter(t => t.owner === agentId), [tickets, agentId]);
   const agentName = agentId;
 
@@ -2041,7 +2203,7 @@ function AgentProfile({ agentId, tickets, onBack, onTicketClick }) {
       {/* Good / Okay / Bad */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12, marginBottom: 20 }}>
         {[["Good", stats.good, "#10B981"], ["Okay", stats.okay, "#FBBF24"], ["Bad", stats.bad, "#EF4444"]].map(([l, v, c]) => (
-          <div key={l} style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 10, padding: "14px 16px", textAlign: "center" }}>
+          <div key={l} onClick={() => onKPIFilter && onKPIFilter({ agent: agentName, happiness: l })} style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 10, padding: "14px 16px", textAlign: "center", cursor: "pointer", transition: "all .12s" }} onMouseEnter={e => { e.currentTarget.style.borderColor = c; e.currentTarget.style.boxShadow = `0 2px 12px ${c}22`; }} onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.boxShadow = "none"; }}>
             <div style={{ fontSize: 28, fontWeight: 800, color: c }}>{v}</div>
             <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>{l} ratings</div>
           </div>
@@ -2120,7 +2282,7 @@ function AgentProfile({ agentId, tickets, onBack, onTicketClick }) {
               <tr key={t.id} style={{ borderBottom: `1px solid #F4F2EE` }}>
                 <td style={{ padding: "9px 14px", color: C.muted, fontSize: 11 }}>{(t.createdTime || "").slice(0, 10)}</td>
                 <td style={{ padding: "9px 14px" }}>
-                  <span onClick={() => onTicketClick && onTicketClick(t.id)} style={{ color: C.accent, cursor: "pointer", fontWeight: 600 }}>#{t.id}</span>
+                  <span onClick={() => onTicketClick && onTicketClick(t.id)} style={{ color: C.accent, cursor: "pointer", fontWeight: 600 }}>{t.ticket_number || t.id}</span>
                 </td>
                 <td style={{ padding: "9px 14px", color: C.sub, maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.reason}</td>
                 <td style={{ padding: "9px 14px" }}>
@@ -2146,6 +2308,7 @@ export default function App() {
   const [anonKey, setAnonKey] = useState("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9tb3dkZnp5dWRlZHJ0Y3VobnZ5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NjQzNjI3OCwiZXhwIjoyMDkyMDEyMjc4fQ.kgQTvZRIrgFXTwL5wDM5oYLmDS9GtRjltE53wcpDQes");
   const [session, setSession] = useState(null);
   const [merchants, setMerchants] = useState([]);
+  const [omanMerchants, setOmanMerchants] = useState([]);
   const [loadingCity, setLoadingCity] = useState("");
   const [tab, setTab] = useState("macro");
   const [selectedMerchantForProfile, setSelectedMerchantForProfile] = useState(null);
@@ -2156,10 +2319,12 @@ export default function App() {
   const [ticketsLoading, setTicketsLoading] = useState(false);
   const [selectedTicketId, setSelectedTicketId] = useState(null);
   const [selectedAgentId, setSelectedAgentId] = useState(null);
+  const [explorerFilters, setExplorerFilters] = useState({});
 
   const handleMerchantClick = (merchant) => {
     setSelectedMerchantForProfile(merchant);
-    setTab("profiler");
+    const isOman = merchant.City === "Muscat";
+    setTab(isOman ? "oman_profiler" : "profiler");
   };
 
   const handleTicketClick = (ticketId) => {
@@ -2217,9 +2382,76 @@ export default function App() {
       } catch (e) { console.warn(`Skip ${city}:`, e.message); }
     }
     setMerchants(all);
+
+    const allOman = [];
+    for (const city of OMAN_CITIES) {
+      const cached = merchantCache.get(city);
+      if (cached && Date.now() - cached.ts < CACHE_TTL) {
+        allOman.push(...cached.data);
+        continue;
+      }
+      setLoadingCity(city);
+      try {
+        const rows = await sbFetch(`merchants_${city}`, anonKey, session.access_token);
+        if (Array.isArray(rows)) {
+          const normalized = rows.map(norm);
+          merchantCache.set(city, { data: normalized, ts: Date.now() });
+          allOman.push(...normalized);
+        }
+      } catch (e) { console.warn(`Skip ${city}:`, e.message); }
+    }
+    setOmanMerchants(allOman);
+
     setLoadingCity("");
-    if (session) await loadStatuses();
+    if (session) {
+      await loadStatuses();
+      await loadFavorites();
+    }
   }
+
+  const [favoriteIds, setFavoriteIds] = useState(new Set());
+
+  const loadFavorites = async () => {
+    if (!session) return;
+    try {
+      const r = await fetch(`${SB_URL}/rest/v1/merchant_favorites?user_email=eq.${encodeURIComponent(session.user.email)}`, { 
+        headers: sbH(anonKey, session.access_token) 
+      });
+      if (!r.ok) return;
+      const rows = await r.json();
+      setFavoriteIds(new Set(rows.map(r => r.merchant_id)));
+    } catch (e) {
+      console.warn("Could not load favorites:", e.message);
+    }
+  };
+
+  const toggleFavorite = async (merchantId) => {
+    if (!session) return;
+    const isFav = favoriteIds.has(merchantId);
+    
+    const newFavs = new Set(favoriteIds);
+    if (isFav) newFavs.delete(merchantId);
+    else newFavs.add(merchantId);
+    setFavoriteIds(newFavs);
+
+    try {
+      if (isFav) {
+        await fetch(`${SB_URL}/rest/v1/merchant_favorites?user_email=eq.${encodeURIComponent(session.user.email)}&merchant_id=eq.${encodeURIComponent(merchantId)}`, {
+          method: "DELETE",
+          headers: sbH(anonKey, session.access_token)
+        });
+      } else {
+        await fetch(`${SB_URL}/rest/v1/merchant_favorites`, {
+          method: "POST",
+          headers: sbH(anonKey, session.access_token),
+          body: JSON.stringify({ user_email: session.user.email, merchant_id: merchantId })
+        });
+      }
+    } catch (e) {
+      console.error("Failed to toggle favorite", e);
+      loadFavorites();
+    }
+  };
 
   async function loadStatuses() {
     try {
@@ -2250,8 +2482,13 @@ export default function App() {
   const TABS = [
     { id: "macro",    label: "Market Overview",      group: "KSA Intelligence", d: "M4 15l4-8 4 4 4-6 4 6" },
     { id: "profiler", label: "Merchant Profiler",    group: "KSA Intelligence", d: "M12 12c2.7 0 5-2.3 5-5s-2.3-5-5-5-5 2.3-5 5 2.3 5 5 5zm0 2c-3.3 0-10 1.7-10 5v1h20v-1c0-3.3-6.7-5-10-5z" },
+    { id: "saved",    label: "Saved Merchants",      group: "KSA Intelligence", d: "M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" },
     { id: "malls",    label: "Malls Profile",        group: "KSA Intelligence", d: "M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4zM3 6h18M16 10a4 4 0 01-8 0" },
     { id: "pipeline", label: "Acquisition Pipeline", group: "KSA Intelligence", d: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" },
+    { id: "oman_macro",    label: "Market Overview",      group: "Oman Intelligence", d: "M4 15l4-8 4 4 4-6 4 6" },
+    { id: "oman_profiler", label: "Merchant Profiler",    group: "Oman Intelligence", d: "M12 12c2.7 0 5-2.3 5-5s-2.3-5-5-5-5 2.3-5 5 2.3 5 5 5zm0 2c-3.3 0-10 1.7-10 5v1h20v-1c0-3.3-6.7-5-10-5z" },
+    { id: "oman_malls",    label: "Malls Profile",        group: "Oman Intelligence", d: "M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4zM3 6h18M16 10a4 4 0 01-8 0" },
+    { id: "oman_pipeline", label: "Acquisition Pipeline", group: "Oman Intelligence", d: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" },
     { id: "support",  label: "Support Overview",     group: "CRM & Support",    d: "M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" },
     { id: "agents",   label: "Agent Performance",    group: "CRM & Support",    d: "M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" },
     { id: "tickets",  label: "Ticket Explorer",      group: "CRM & Support",    d: "M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8zM14 2v6h6M16 13H8M16 17H8M10 9H8" },
@@ -2283,13 +2520,15 @@ export default function App() {
   }, [merchants]);
 
   const unifiedMerchants = useMemo(() => merchants.map(m => ({ ...m, OriginalMerchant: m.Merchant, Merchant: canonicalMap[m.Merchant] || m.Merchant })), [merchants, canonicalMap]);
+  const omanUnifiedMerchants = useMemo(() => omanMerchants.map(m => ({ ...m, OriginalMerchant: m.Merchant, Merchant: canonicalMap[m.Merchant] || m.Merchant })), [omanMerchants, canonicalMap]);
 
+  const statsSource = tab.startsWith("oman_") ? omanUnifiedMerchants : unifiedMerchants;
   const sidebarStats = useMemo(() => [
-    ["Total", unifiedMerchants.length.toLocaleString()],
-    ["Cities", new Set(unifiedMerchants.map(m => m.City)).size],
-    ["Avg ★", (unifiedMerchants.reduce((s, m) => s + (m.Rating || 0), 0) / (unifiedMerchants.filter(m => m.Rating > 0).length || 1)).toFixed(2)],
-    ["High", unifiedMerchants.filter(m => m.Priority.toLowerCase().includes("high")).length.toLocaleString()],
-  ], [unifiedMerchants]);
+    ["Total", statsSource.length.toLocaleString()],
+    ["Cities", new Set(statsSource.map(m => m.City)).size],
+    ["Avg ★", (statsSource.reduce((s, m) => s + (m.Rating || 0), 0) / (statsSource.filter(m => m.Rating > 0).length || 1)).toFixed(2)],
+    ["High", statsSource.filter(m => m.Priority.toLowerCase().includes("high")).length.toLocaleString()],
+  ], [statsSource]);
 
   if (!anonKey) return <SetupScreen onSetup={setAnonKey} />;
   if (!session) return <LoginScreen anonKey={anonKey} onLogin={(s) => { setSession(s); if (s) logAudit(anonKey, s.access_token, s.user.id, "login", "auth"); }} />;
@@ -2307,9 +2546,9 @@ export default function App() {
         </div>
 
         <nav style={{ padding: "10px 8px", flex: 1, overflowY: "auto" }}>
-          {["KSA Intelligence", "CRM & Support"].map(group => (
+          {["KSA Intelligence", "Oman Intelligence", "CRM & Support"].map(group => (
             <div key={group}>
-              <div style={{ fontSize: 9, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: 1, padding: "8px 10px 4px", marginTop: group === "CRM & Support" ? 8 : 0 }}>
+              <div style={{ fontSize: 9, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: 1, padding: "8px 10px 4px", marginTop: group === "KSA Intelligence" ? 0 : 8 }}>
                 {group}
               </div>
               {visibleTabs.filter(t => t.group === group).map(({ id, label, d }) => (
@@ -2357,9 +2596,16 @@ export default function App() {
       {/* Main */}
       <main style={{ flex: 1, overflowY: "auto", padding: 24 }}>
         {tab === "macro" && <MacroTab merchants={unifiedMerchants} />}
-        {tab === "profiler" && <ProfilerTab merchants={unifiedMerchants} anonKey={anonKey} initialMerchant={selectedMerchantForProfile} tickets={tickets} />}
+        {tab === "profiler" && <ProfilerTab merchants={unifiedMerchants} anonKey={anonKey} initialMerchant={selectedMerchantForProfile} tickets={tickets} userEmail={session?.user?.email} favoriteIds={favoriteIds} toggleFavorite={toggleFavorite} />}
+        {tab === "saved" && <SavedMerchantsTab merchants={unifiedMerchants} favoriteIds={favoriteIds} onMerchantClick={handleMerchantClick} />}
         {tab === "malls" && <MallsTab merchants={unifiedMerchants} onMerchantClick={handleMerchantClick} statuses={statuses} onStatusChange={handleStatusChange} />}
         {tab === "pipeline" && <PipelineTab merchants={unifiedMerchants} onMerchantClick={handleMerchantClick} statuses={statuses} onStatusChange={handleStatusChange} />}
+        
+        {tab === "oman_macro" && <MacroTab merchants={omanUnifiedMerchants} region="Oman" />}
+        {tab === "oman_profiler" && <ProfilerTab merchants={omanUnifiedMerchants} anonKey={anonKey} initialMerchant={selectedMerchantForProfile} tickets={tickets} region="Oman" userEmail={session?.user?.email} favoriteIds={favoriteIds} toggleFavorite={toggleFavorite} />}
+        {tab === "oman_malls" && <MallsTab merchants={omanUnifiedMerchants} onMerchantClick={handleMerchantClick} statuses={statuses} onStatusChange={handleStatusChange} region="Oman" />}
+        {tab === "oman_pipeline" && <PipelineTab merchants={omanUnifiedMerchants} onMerchantClick={handleMerchantClick} statuses={statuses} onStatusChange={handleStatusChange} region="Oman" />}
+
         {tab === "support" && (ticketsLoading
           ? <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "60vh", color: C.muted, fontSize: 13 }}>Loading {tickets.length.toLocaleString()} tickets…</div>
           : <SupportTab tickets={tickets} />)}
@@ -2368,12 +2614,12 @@ export default function App() {
           : <AgentsTab tickets={tickets} onAgentClick={handleAgentClick} />)}
         {tab === "tickets" && (ticketsLoading
           ? <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "60vh", color: C.muted, fontSize: 13 }}>Loading tickets…</div>
-          : <TicketExplorerTab tickets={tickets} onTicketClick={handleTicketClick} />)}
+          : <TicketExplorerTab tickets={tickets} onTicketClick={handleTicketClick} initialFilters={explorerFilters} />)}
         {tab === "chat" && (ticketsLoading
           ? <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "60vh", color: C.muted, fontSize: 13 }}>Loading tickets…</div>
-          : <ChatReview tickets={tickets} initialTicketId={selectedTicketId} />)}
+          : <ChatReview tickets={tickets} initialTicketId={selectedTicketId} onAgentClick={handleAgentClick} />)}
         {tab === "agentProfile" && (
-          <AgentProfile agentId={selectedAgentId} tickets={tickets} onBack={() => setTab("agents")} onTicketClick={handleTicketClick} />
+          <AgentProfile agentId={selectedAgentId} tickets={tickets} onBack={() => setTab("agents")} onTicketClick={handleTicketClick} onKPIFilter={(f) => { setExplorerFilters(f); handleTabChange("tickets"); }} />
         )}
       </main>
     </div>

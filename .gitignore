@@ -1,14 +1,34 @@
+# Environment & Secrets
 .env
+.env*.local
 .venv/
+
+# Build & Dependencies
+node_modules/
+build/
+dist/
+.next/
+.vercel
+
+# Data & Archives
 _archive/
+output/
+data/checkpoints/
+*.csv
+*.txt
+*.json.bak
+tickets_rows*
+ticket_analysis_rows*
+
+# Logs & Cache
 *.log
 __pycache__/
 .DS_Store
+*.pyc
+.pytest_cache/
 
-# React Dashboard
-node_modules/
-build/
-.next/
-dist/
-.vercel
-.env*.local
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo

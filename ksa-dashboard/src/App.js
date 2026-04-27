@@ -2327,7 +2327,12 @@ function AgentProfile({ agentId, tickets, onBack, onTicketClick, onKPIFilter }) 
 /* ─── MAIN APP ───────────────────────────────────────────────── */
 export default function App() {
   const [anonKey, setAnonKey] = useState("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9tb3dkZnp5dWRlZHJ0Y3VobnZ5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NjQzNjI3OCwiZXhwIjoyMDkyMDEyMjc4fQ.kgQTvZRIrgFXTwL5wDM5oYLmDS9GtRjltE53wcpDQes");
-  const [session, setSession] = useState(null);
+  const [session, setSession] = useState(() => {
+    try {
+      const saved = localStorage.getItem("wn_session");
+      return saved ? JSON.parse(saved) : null;
+    } catch (e) { return null; }
+  });
   const [merchants, setMerchants] = useState([]);
   const [omanMerchants, setOmanMerchants] = useState([]);
   const [loadingCity, setLoadingCity] = useState("");
@@ -2369,8 +2374,39 @@ export default function App() {
 
   useEffect(() => {
     if (session && anonKey) loadAllMerchants();
+    
+    // 2. Inactivity: Auto-logout after 30 minutes
+    let timeout;
+    const INACTIVITY_LIMIT = 30 * 60 * 1000; // 30 mins
+
+    const resetTimer = () => {
+      if (timeout) clearTimeout(timeout);
+      if (session) {
+        timeout = setTimeout(() => {
+          setSession(null);
+          localStorage.removeItem("wn_session");
+          alert("Session expired due to inactivity. Please sign in again.");
+        }, INACTIVITY_LIMIT);
+      }
+    };
+
+    if (session) {
+      window.addEventListener('mousemove', resetTimer);
+      window.addEventListener('keypress', resetTimer);
+      window.addEventListener('scroll', resetTimer);
+      window.addEventListener('click', resetTimer);
+      resetTimer();
+    }
+
+    return () => {
+      window.removeEventListener('mousemove', resetTimer);
+      window.removeEventListener('keypress', resetTimer);
+      window.removeEventListener('scroll', resetTimer);
+      window.removeEventListener('click', resetTimer);
+      if (timeout) clearTimeout(timeout);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session]);
+  }, [session, anonKey]);
 
   async function loadTickets() {
     if (ticketsLoaded || ticketsLoading) return;
@@ -2385,48 +2421,62 @@ export default function App() {
   }
 
   async function loadAllMerchants() {
-    const all = [];
-    for (const city of CITIES) {
-      const cached = merchantCache.get(city);
-      if (cached && Date.now() - cached.ts < CACHE_TTL) {
-        all.push(...cached.data);
-        continue;
-      }
-      setLoadingCity(city);
-      try {
-        const rows = await sbFetch(`merchants_${city}`, anonKey, session.access_token);
-        if (Array.isArray(rows)) {
-          const normalized = rows.map(norm);
-          merchantCache.set(city, { data: normalized, ts: Date.now() });
-          all.push(...normalized);
+    setLoadingCity("Loading merchants...");
+    
+    // Attempt instant load from cache
+    try {
+      const cachedKsa = localStorage.getItem("wn_merchants_ksa");
+      const cachedOman = localStorage.getItem("wn_merchants_oman");
+      const cacheTime = localStorage.getItem("wn_merchants_time");
+      if (cachedKsa && cachedOman && cacheTime && (Date.now() - parseInt(cacheTime)) < CACHE_TTL) {
+        setMerchants(JSON.parse(cachedKsa));
+        setOmanMerchants(JSON.parse(cachedOman));
+        setLoadingCity("");
+        if (session) {
+          loadStatuses();
+          loadFavorites();
         }
-      } catch (e) { console.warn(`Skip ${city}:`, e.message); }
-    }
-    setMerchants(all);
+        return; 
+      } else if (cachedKsa && cachedOman) {
+        // Optimistic UI: show stale data immediately
+        setMerchants(JSON.parse(cachedKsa));
+        setOmanMerchants(JSON.parse(cachedOman));
+      }
+    } catch(e) { console.warn("Cache read error"); }
 
-    const allOman = [];
-    for (const city of OMAN_CITIES) {
-      const cached = merchantCache.get(city);
-      if (cached && Date.now() - cached.ts < CACHE_TTL) {
-        allOman.push(...cached.data);
-        continue;
-      }
-      setLoadingCity(city);
+    const fetchCity = async (city) => {
       try {
         const rows = await sbFetch(`merchants_${city}`, anonKey, session.access_token);
-        if (Array.isArray(rows)) {
-          const normalized = rows.map(norm);
-          merchantCache.set(city, { data: normalized, ts: Date.now() });
-          allOman.push(...normalized);
-        }
-      } catch (e) { console.warn(`Skip ${city}:`, e.message); }
-    }
-    setOmanMerchants(allOman);
+        if (Array.isArray(rows)) return rows.map(norm);
+      } catch (e) {
+        console.warn(`Skip ${city}:`, e.message);
+      }
+      return [];
+    };
+
+    // Parallel fetch for speed
+    const [ksaResults, omanResults] = await Promise.all([
+      Promise.all(CITIES.map(fetchCity)),
+      Promise.all(OMAN_CITIES.map(fetchCity))
+    ]);
+
+    const flatKsa = ksaResults.flat();
+    const flatOman = omanResults.flat();
+
+    setMerchants(flatKsa);
+    setOmanMerchants(flatOman);
+    
+    // Save to cache
+    try {
+      localStorage.setItem("wn_merchants_ksa", JSON.stringify(flatKsa));
+      localStorage.setItem("wn_merchants_oman", JSON.stringify(flatOman));
+      localStorage.setItem("wn_merchants_time", Date.now().toString());
+    } catch (e) { console.warn("Cache write error (quota exceeded)"); }
 
     setLoadingCity("");
     if (session) {
-      await loadStatuses();
-      await loadFavorites();
+      loadStatuses();
+      loadFavorites();
     }
   }
 
@@ -2553,7 +2603,13 @@ export default function App() {
   ], [statsSource]);
 
   if (!anonKey) return <SetupScreen onSetup={setAnonKey} />;
-  if (!session) return <LoginScreen anonKey={anonKey} onLogin={(s) => { setSession(s); if (s) logAudit(anonKey, s.access_token, s.user.id, "login", "auth"); }} />;
+  if (!session) return <LoginScreen anonKey={anonKey} onLogin={(s) => { 
+    setSession(s); 
+    if (s) {
+      localStorage.setItem("wn_session", JSON.stringify(s));
+      logAudit(anonKey, s.access_token, s.user.id, "login", "auth"); 
+    }
+  }} />;
   if (loadingCity) return <LoadingScreen />;
 
   const visibleTabs = TABS.filter(t => t.id !== "agentProfile");
@@ -2608,7 +2664,13 @@ export default function App() {
               ))}
             </>
           )}
-          <button onClick={() => { setSession(null); setMerchants([]); setTickets([]); setTicketsLoaded(false); }}
+          <button onClick={() => { 
+            setSession(null); 
+            setMerchants([]); 
+            setTickets([]); 
+            setTicketsLoaded(false); 
+            localStorage.removeItem("wn_session");
+          }}
             style={{ marginTop: 10, width: "100%", padding: "6px 0", background: "#F4F2EE", border: "none", borderRadius: 6, fontSize: 11, color: C.muted, cursor: "pointer" }}>
             Sign Out
           </button>

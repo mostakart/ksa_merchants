@@ -233,6 +233,8 @@ export default function MerchantNotes({ merchantId, authorName, anonKey }) {
         .ql-toolbar { border: none !important; border-bottom: 1px solid #E5E7EB !important; background: #F9FAFB; border-top-left-radius: 8px; border-top-right-radius: 8px; direction: ltr; }
         .ql-editor { min-height: 100px; text-align: start; unicode-bidi: plaintext; padding: 12px 16px; }
         .ql-editor p { direction: auto; }
+        .note-more-btn:hover { background: #F3F4F6 !important; color: #374151 !important; }
+        .note-dropdown-item:hover { background: #F9FAFB !important; }
       `}</style>
       
       <h3 style={styles.header}>Team Notes & Comments</h3>
@@ -322,6 +324,7 @@ export default function MerchantNotes({ merchantId, authorName, anonKey }) {
                     
                     <div style={styles.menuContainer}>
                       <button 
+                        className="note-more-btn"
                         style={styles.moreBtn} 
                         onClick={() => setMenuOpenId(menuOpenId === note.id ? null : note.id)}
                       >
@@ -330,7 +333,15 @@ export default function MerchantNotes({ merchantId, authorName, anonKey }) {
                       {menuOpenId === note.id && (
                         <div style={styles.dropdownMenu} ref={menuRef}>
                           {note.author_name === authorName && (
-                            <button style={{ ...styles.dropdownItem, color: '#DC2626' }} onClick={() => handleDeleteNote(note.id)}>Delete note</button>
+                            <button className="note-dropdown-item" style={styles.dropdownItem} onClick={() => handleDeleteNote(note.id)}>
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="3 6 5 6 21 6"></polyline>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                <line x1="10" y1="11" x2="10" y2="17"></line>
+                                <line x1="14" y1="11" x2="14" y2="17"></line>
+                              </svg>
+                              <span style={{ color: '#DC2626' }}>Delete note</span>
+                            </button>
                           )}
                         </div>
                       )}
@@ -538,6 +549,51 @@ const styles = {
   noteItem: {
     display: 'flex',
     gap: 16,
+  },
+  menuContainer: {
+    position: 'relative',
+    marginLeft: 'auto'
+  },
+  moreBtn: {
+    background: 'none',
+    border: 'none',
+    color: '#9CA3AF',
+    fontSize: 18,
+    cursor: 'pointer',
+    padding: '0 4px',
+    lineHeight: 1,
+    borderRadius: 4,
+    transition: 'all 0.2s',
+  },
+  dropdownMenu: {
+    position: 'absolute',
+    top: '100%',
+    right: 0,
+    background: '#FFF',
+    border: '1px solid #E5E7EB',
+    borderRadius: 8,
+    boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+    zIndex: 100,
+    minWidth: 140,
+    marginTop: 4,
+    padding: 4,
+    overflow: 'hidden'
+  },
+  dropdownItem: {
+    width: '100%',
+    textAlign: 'left',
+    background: 'none',
+    border: 'none',
+    padding: '8px 12px',
+    fontSize: 13,
+    fontWeight: 500,
+    cursor: 'pointer',
+    borderRadius: 6,
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    transition: 'background 0.2s',
+    color: '#374151'
   },
   noteContentWrapper: {
     flex: 1,

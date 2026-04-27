@@ -2508,6 +2508,7 @@ export default function App() {
     { id: "pipeline", label: "Acquisition Pipeline", group: "KSA Intelligence", d: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" },
     { id: "oman_macro",    label: "Market Overview",      group: "Oman Intelligence", d: "M4 15l4-8 4 4 4-6 4 6" },
     { id: "oman_profiler", label: "Merchant Profiler",    group: "Oman Intelligence", d: "M12 12c2.7 0 5-2.3 5-5s-2.3-5-5-5-5 2.3-5 5 2.3 5 5 5zm0 2c-3.3 0-10 1.7-10 5v1h20v-1c0-3.3-6.7-5-10-5z" },
+    { id: "oman_saved",    label: "Saved Merchants",      group: "Oman Intelligence", d: "M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" },
     { id: "oman_malls",    label: "Malls Profile",        group: "Oman Intelligence", d: "M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4zM3 6h18M16 10a4 4 0 01-8 0" },
     { id: "oman_pipeline", label: "Acquisition Pipeline", group: "Oman Intelligence", d: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" },
     { id: "support",  label: "Support Overview",     group: "CRM & Support",    d: "M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" },
@@ -2624,6 +2625,7 @@ export default function App() {
         
         {tab === "oman_macro" && <MacroTab merchants={omanUnifiedMerchants} region="Oman" />}
         {tab === "oman_profiler" && <ProfilerTab merchants={omanUnifiedMerchants} anonKey={anonKey} initialMerchant={selectedMerchantForProfile} tickets={tickets} region="Oman" userEmail={session?.user?.email} favoriteIds={favoriteIds} toggleFavorite={toggleFavorite} />}
+        {tab === "oman_saved" && <SavedMerchantsTab merchants={omanUnifiedMerchants} favoriteIds={favoriteIds} onMerchantClick={handleMerchantClick} />}
         {tab === "oman_malls" && <MallsTab merchants={omanUnifiedMerchants} onMerchantClick={handleMerchantClick} statuses={statuses} onStatusChange={handleStatusChange} region="Oman" />}
         {tab === "oman_pipeline" && <PipelineTab merchants={omanUnifiedMerchants} onMerchantClick={handleMerchantClick} statuses={statuses} onStatusChange={handleStatusChange} region="Oman" />}
 

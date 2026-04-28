@@ -306,6 +306,7 @@ export default function MerchantNotes({ merchantId, authorName, anonKey, userRol
             </button>
           </div>
         </div>
+      </div>
       )}
 
       <div style={styles.notesList}>

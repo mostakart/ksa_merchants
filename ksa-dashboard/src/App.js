@@ -1444,6 +1444,7 @@ function ProfilerTab({ merchants, anonKey, initialMerchant, tickets, region = "K
               <MerchantProfiler initialMerchant={selected} embedded={true} tickets={tickets} />
             </Card>
           </div>
+          <div style={{ marginTop: 16 }}>
             <MerchantNotes 
               merchantId={selected.Merchant} 
               authorName={userEmail || localStorage.getItem("wn_email") || "Team Member"} 

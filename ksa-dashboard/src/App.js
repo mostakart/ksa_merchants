@@ -1223,8 +1223,8 @@ function MacroTab({ merchants, region = "KSA" }) {
   );
 }
 
-/* ─── PROFILER TAB ───────────────────────────────────────────── */
-function ProfilerTab({ merchants, anonKey, initialMerchant, tickets, region = "KSA", userEmail, favoriteIds, toggleFavorite }) {
+/* ─── MERCHANT PROFILER TAB ────────────────────────────────────── */
+function ProfilerTab({ merchants, anonKey, initialMerchant, tickets, region = "KSA", userEmail, favoriteIds, toggleFavorite, userRole }) {
   const [query, setQuery] = useState(initialMerchant ? initialMerchant.Merchant : "");
   const [selected, setSelected] = useState(initialMerchant || null);
   const [showList, setShowList] = useState(false);
@@ -1444,11 +1444,12 @@ function ProfilerTab({ merchants, anonKey, initialMerchant, tickets, region = "K
               <MerchantProfiler initialMerchant={selected} embedded={true} tickets={tickets} />
             </Card>
           </div>
-          <div style={{ marginTop: 16 }}>
             <MerchantNotes 
               merchantId={selected.Merchant} 
               authorName={userEmail || localStorage.getItem("wn_email") || "Team Member"} 
               anonKey={anonKey} 
+              userRole={userRole}
+              region={region}
             />
           </div>
         </>
@@ -1463,7 +1464,7 @@ function ProfilerTab({ merchants, anonKey, initialMerchant, tickets, region = "K
 }
 
 /* ─── PIPELINE TAB ───────────────────────────────────────────── */
-function PipelineTab({ merchants, onMerchantClick, statuses, onStatusChange }) {
+function PipelineTab({ merchants, onMerchantClick, statuses, onStatusChange, region = "KSA", userRole }) {
   const [city, setCity] = useState("All");
   const [mall, setMall] = useState("All");
   const [prio, setPrio] = useState("All");
@@ -1626,10 +1627,14 @@ function PipelineTab({ merchants, onMerchantClick, statuses, onStatusChange }) {
                     <td style={{ padding: "9px 12px", color: C.muted }}>{m.AvgPrice || "—"}</td>
                     <td style={{ padding: "9px 12px", color: C.muted, fontSize: 11, maxWidth: 150, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={m.OpeningHours}>{m.OpeningHours || "—"}</td>
                     <td style={{ padding: "9px 12px" }}>
-                      <select value={st} onChange={e => onStatusChange(m, e.target.value)}
-                        style={{ padding: "3px 7px", borderRadius: 5, fontSize: 10, fontWeight: 500, border: "none", cursor: "pointer", outline: "none", ...statusStyles[st] }}>
-                        {Object.keys(statusStyles).map(s => <option key={s}>{s}</option>)}
-                      </select>
+                      {(userRole === 'admin' || userRole === 'global_bd' || (userRole === 'ksa_bd' && region === 'KSA') || (userRole === 'oman_bd' && region === 'Oman')) ? (
+                        <select value={st} onChange={e => onStatusChange(m, e.target.value)}
+                          style={{ padding: "3px 7px", borderRadius: 5, fontSize: 10, fontWeight: 500, border: "none", cursor: "pointer", outline: "none", ...statusStyles[st] }}>
+                          {Object.keys(statusStyles).map(s => <option key={s}>{s}</option>)}
+                        </select>
+                      ) : (
+                        <span style={{ padding: "3px 7px", borderRadius: 5, fontSize: 10, fontWeight: 500, ...statusStyles[st] }}>{st}</span>
+                      )}
                     </td>
                   </tr>
                 );
@@ -1741,7 +1746,7 @@ function SavedMerchantsTab({ merchants, favoriteIds, onMerchantClick }) {
 }
 
 /* ─── MALLS PROFILE TAB ──────────────────────────────────────── */
-function MallsTab({ merchants, onMerchantClick, statuses, onStatusChange, region = "KSA" }) {
+function MallsTab({ merchants, onMerchantClick, statuses, onStatusChange, region = "KSA", userRole }) {
   const [cityFilter, setCityFilter] = useState("All");
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState("merchants");
@@ -1840,10 +1845,14 @@ function MallsTab({ merchants, onMerchantClick, statuses, onStatusChange, region
                       <td style={{ padding: "10px 12px", color: C.sub }}>{m.AvgPrice || "—"}</td>
                       <td style={{ padding: "10px 12px", color: C.sub, maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.HoursCategory}</td>
                       <td style={{ padding: "10px 12px" }}>
-                        <select value={status} onChange={e => onStatusChange(m, e.target.value)}
-                          style={{ ...statusStyles[status], fontSize: 11, padding: "3px 7px", borderRadius: 5, border: "none", cursor: "pointer", fontWeight: 500 }}>
-                          {["Uncontacted", "Contacted", "In Progress", "Closed Deal"].map(s => <option key={s} value={s}>{s}</option>)}
-                        </select>
+                        {(userRole === 'admin' || userRole === 'global_bd' || (userRole === 'ksa_bd' && region === 'KSA') || (userRole === 'oman_bd' && region === 'Oman')) ? (
+                          <select value={status} onChange={e => onStatusChange(m, e.target.value)}
+                            style={{ ...statusStyles[status], fontSize: 11, padding: "3px 7px", borderRadius: 5, border: "none", cursor: "pointer", fontWeight: 500 }}>
+                            {["Uncontacted", "Contacted", "In Progress", "Closed Deal"].map(s => <option key={s} value={s}>{s}</option>)}
+                          </select>
+                        ) : (
+                          <span style={{ ...statusStyles[status], fontSize: 11, padding: "3px 7px", borderRadius: 5, fontWeight: 500 }}>{status}</span>
+                        )}
                       </td>
                     </tr>
                   );
@@ -2324,6 +2333,125 @@ function AgentProfile({ agentId, tickets, onBack, onTicketClick, onKPIFilter }) 
   );
 }
 
+/* ─── ADMIN SETTINGS ─────────────────────────────────────────── */
+function AdminSettingsTab({ anonKey, session }) {
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [email, setEmail] = useState('');
+  const [role, setRole] = useState('viewer');
+  const [saving, setSaving] = useState(false);
+
+  const fetchUsers = async () => {
+    try {
+      const res = await fetch(`${SB_URL}/rest/v1/user_roles`, { headers: sbH(anonKey, session.access_token) });
+      if (res.ok) setUsers(await res.json());
+    } catch (e) { console.error("Failed to fetch roles", e); }
+    setLoading(false);
+  };
+
+  useEffect(() => { fetchUsers(); }, []);
+
+  const handleSave = async (e) => {
+    e.preventDefault();
+    if (!email) return;
+    setSaving(true);
+    try {
+      await fetch(`${SB_URL}/rest/v1/user_roles`, {
+        method: "POST",
+        headers: { ...sbH(anonKey, session.access_token), "Prefer": "resolution=merge-duplicates" },
+        body: JSON.stringify({ email: email.toLowerCase(), role, updated_by: session.user.email })
+      });
+      setEmail('');
+      setRole('viewer');
+      fetchUsers();
+    } catch (e) { alert("Failed to save role: " + e.message); }
+    setSaving(false);
+  };
+
+  const handleDelete = async (targetEmail) => {
+    if (!window.confirm(`Revoke access for ${targetEmail}?`)) return;
+    try {
+      await fetch(`${SB_URL}/rest/v1/user_roles?email=eq.${encodeURIComponent(targetEmail)}`, {
+        method: "DELETE",
+        headers: sbH(anonKey, session.access_token)
+      });
+      fetchUsers();
+    } catch (e) { alert("Failed to delete role"); }
+  };
+
+  return (
+    <div style={{ maxWidth: 800, margin: "0 auto" }}>
+      <div style={{ marginBottom: 24 }}>
+        <h2 style={{ fontSize: 24, fontWeight: 700, margin: "0 0 4px", letterSpacing: "-.5px" }}>Admin Settings</h2>
+        <p style={{ margin: 0, color: C.muted, fontSize: 13 }}>Manage roles and access permissions for Nexus users.</p>
+      </div>
+
+      <Card style={{ marginBottom: 24 }}>
+        <h3 style={{ fontSize: 14, fontWeight: 600, margin: "0 0 16px" }}>Assign New Role</h3>
+        <form onSubmit={handleSave} style={{ display: "flex", gap: 12, alignItems: "flex-end" }}>
+          <div style={{ flex: 1 }}>
+            <label style={{ display: "block", fontSize: 11, fontWeight: 500, color: C.sub, marginBottom: 6, textTransform: "uppercase" }}>User Email</label>
+            <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="user@waffarha.com" required
+              style={{ width: "100%", padding: "10px 12px", border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 13, outline: "none" }} />
+          </div>
+          <div style={{ width: 200 }}>
+            <label style={{ display: "block", fontSize: 11, fontWeight: 500, color: C.sub, marginBottom: 6, textTransform: "uppercase" }}>Role</label>
+            <select value={role} onChange={e => setRole(e.target.value)}
+              style={{ width: "100%", padding: "10px 12px", border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 13, outline: "none", backgroundColor: "#fff" }}>
+              <option value="admin">Super Admin</option>
+              <option value="global_bd">Global BD Lead</option>
+              <option value="ksa_bd">KSA BD Manager</option>
+              <option value="oman_bd">Oman BD Manager</option>
+              <option value="crm_lead">CRM / Support Lead</option>
+              <option value="viewer">Viewer (Read Only)</option>
+            </select>
+          </div>
+          <button type="submit" disabled={saving} style={{ padding: "10px 24px", background: C.accent, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", height: 40 }}>
+            {saving ? "Saving..." : "Save Role"}
+          </button>
+        </form>
+      </Card>
+
+      <Card style={{ padding: 0, overflow: "hidden" }}>
+        <div style={{ padding: "16px 20px", borderBottom: `1px solid ${C.border}` }}>
+          <h3 style={{ fontSize: 14, fontWeight: 600, margin: 0 }}>Active Users</h3>
+        </div>
+        {loading ? (
+          <div style={{ padding: 40, textAlign: "center", color: C.muted, fontSize: 13 }}>Loading users...</div>
+        ) : (
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+            <thead>
+              <tr style={{ background: "#F9F8F7", borderBottom: `1px solid ${C.border}` }}>
+                <th style={{ padding: "12px 20px", textAlign: "left", color: C.sub, fontWeight: 500, fontSize: 11, textTransform: "uppercase" }}>Email</th>
+                <th style={{ padding: "12px 20px", textAlign: "left", color: C.sub, fontWeight: 500, fontSize: 11, textTransform: "uppercase" }}>Role</th>
+                <th style={{ padding: "12px 20px", textAlign: "left", color: C.sub, fontWeight: 500, fontSize: 11, textTransform: "uppercase" }}>Added</th>
+                <th style={{ padding: "12px 20px", textAlign: "right" }}></th>
+              </tr>
+            </thead>
+            <tbody>
+              {users.map(u => (
+                <tr key={u.email} style={{ borderBottom: `1px solid ${C.border}` }}>
+                  <td style={{ padding: "12px 20px", fontWeight: 500 }}>{u.email}</td>
+                  <td style={{ padding: "12px 20px" }}>
+                    <span style={{ padding: "4px 8px", background: C.accentL, color: C.accent, borderRadius: 6, fontSize: 11, fontWeight: 600 }}>{u.role}</span>
+                  </td>
+                  <td style={{ padding: "12px 20px", color: C.muted }}>{(u.created_at || "").slice(0, 10)}</td>
+                  <td style={{ padding: "12px 20px", textAlign: "right" }}>
+                    {u.email !== session.user.email && (
+                      <button onClick={() => handleDelete(u.email)} style={{ background: "none", border: "none", color: "#DC2626", cursor: "pointer", fontSize: 12, fontWeight: 500 }}>Revoke</button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+              {users.length === 0 && <tr><td colSpan={4} style={{ padding: 40, textAlign: "center", color: C.muted }}>No roles assigned yet.</td></tr>}
+            </tbody>
+          </table>
+        )}
+      </Card>
+    </div>
+  );
+}
+
 /* ─── MAIN APP ───────────────────────────────────────────────── */
 export default function App() {
   const [anonKey, setAnonKey] = useState("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9tb3dkZnp5dWRlZHJ0Y3VobnZ5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NjQzNjI3OCwiZXhwIjoyMDkyMDEyMjc4fQ.kgQTvZRIrgFXTwL5wDM5oYLmDS9GtRjltE53wcpDQes");
@@ -2346,6 +2474,27 @@ export default function App() {
   const [selectedTicketId, setSelectedTicketId] = useState(null);
   const [selectedAgentId, setSelectedAgentId] = useState(null);
   const [explorerFilters, setExplorerFilters] = useState({});
+  const [userRole, setUserRole] = useState(() => {
+    try {
+      const saved = localStorage.getItem("wn_user_role");
+      return saved || null;
+    } catch (e) { return null; }
+  });
+
+  const loadUserRole = async () => {
+    if (!session) return;
+    try {
+      const r = await fetch(`${SB_URL}/rest/v1/user_roles?email=eq.${encodeURIComponent(session.user.email)}`, { 
+        headers: sbH(anonKey, session.access_token) 
+      });
+      if (r.ok) {
+        const rows = await r.json();
+        const role = rows.length > 0 ? rows[0].role : 'viewer'; // Default to viewer if not found
+        setUserRole(role);
+        localStorage.setItem("wn_user_role", role);
+      }
+    } catch (e) { console.warn("Could not load user role:", e.message); }
+  };
 
   const handleMerchantClick = (merchant) => {
     setSelectedMerchantForProfile(merchant);
@@ -2373,7 +2522,10 @@ export default function App() {
   };
 
   useEffect(() => {
-    if (session && anonKey) loadAllMerchants();
+    if (session && anonKey) {
+      loadAllMerchants();
+      loadUserRole();
+    }
     
     // 2. Inactivity: Auto-logout after 30 minutes
     let timeout;
@@ -2551,20 +2703,21 @@ export default function App() {
   }
 
   const TABS = [
-    { id: "macro",    label: "Market Overview",      group: "KSA Intelligence", d: "M4 15l4-8 4 4 4-6 4 6" },
-    { id: "profiler", label: "Merchant Profiler",    group: "KSA Intelligence", d: "M12 12c2.7 0 5-2.3 5-5s-2.3-5-5-5-5 2.3-5 5 2.3 5 5 5zm0 2c-3.3 0-10 1.7-10 5v1h20v-1c0-3.3-6.7-5-10-5z" },
-    { id: "saved",    label: "Saved Merchants",      group: "KSA Intelligence", d: "M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" },
-    { id: "malls",    label: "Malls Profile",        group: "KSA Intelligence", d: "M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4zM3 6h18M16 10a4 4 0 01-8 0" },
-    { id: "pipeline", label: "Acquisition Pipeline", group: "KSA Intelligence", d: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" },
-    { id: "oman_macro",    label: "Market Overview",      group: "Oman Intelligence", d: "M4 15l4-8 4 4 4-6 4 6" },
-    { id: "oman_profiler", label: "Merchant Profiler",    group: "Oman Intelligence", d: "M12 12c2.7 0 5-2.3 5-5s-2.3-5-5-5-5 2.3-5 5 2.3 5 5 5zm0 2c-3.3 0-10 1.7-10 5v1h20v-1c0-3.3-6.7-5-10-5z" },
-    { id: "oman_saved",    label: "Saved Merchants",      group: "Oman Intelligence", d: "M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" },
-    { id: "oman_malls",    label: "Malls Profile",        group: "Oman Intelligence", d: "M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4zM3 6h18M16 10a4 4 0 01-8 0" },
-    { id: "oman_pipeline", label: "Acquisition Pipeline", group: "Oman Intelligence", d: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" },
-    { id: "support",  label: "Support Overview",     group: "CRM & Support",    d: "M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" },
-    { id: "agents",   label: "Agent Performance",    group: "CRM & Support",    d: "M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" },
-    { id: "tickets",  label: "Ticket Explorer",      group: "CRM & Support",    d: "M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8zM14 2v6h6M16 13H8M16 17H8M10 9H8" },
-    { id: "chat",     label: "Chat Review",          group: "CRM & Support",    d: "M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" },
+    { id: "macro",    label: "Market Overview",      group: "KSA Intelligence", roles: ["admin", "ksa_bd", "global_bd", "viewer"], d: "M4 15l4-8 4 4 4-6 4 6" },
+    { id: "profiler", label: "Merchant Profiler",    group: "KSA Intelligence", roles: ["admin", "ksa_bd", "global_bd"], d: "M12 12c2.7 0 5-2.3 5-5s-2.3-5-5-5-5 2.3-5 5 2.3 5 5 5zm0 2c-3.3 0-10 1.7-10 5v1h20v-1c0-3.3-6.7-5-10-5z" },
+    { id: "saved",    label: "Saved Merchants",      group: "KSA Intelligence", roles: ["admin", "ksa_bd", "global_bd"], d: "M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" },
+    { id: "malls",    label: "Malls Profile",        group: "KSA Intelligence", roles: ["admin", "ksa_bd", "global_bd", "viewer"], d: "M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4zM3 6h18M16 10a4 4 0 01-8 0" },
+    { id: "pipeline", label: "Acquisition Pipeline", group: "KSA Intelligence", roles: ["admin", "ksa_bd", "global_bd", "viewer"], d: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" },
+    { id: "oman_macro",    label: "Market Overview",      group: "Oman Intelligence", roles: ["admin", "oman_bd", "global_bd", "viewer"], d: "M4 15l4-8 4 4 4-6 4 6" },
+    { id: "oman_profiler", label: "Merchant Profiler",    group: "Oman Intelligence", roles: ["admin", "oman_bd", "global_bd"], d: "M12 12c2.7 0 5-2.3 5-5s-2.3-5-5-5-5 2.3-5 5 2.3 5 5 5zm0 2c-3.3 0-10 1.7-10 5v1h20v-1c0-3.3-6.7-5-10-5z" },
+    { id: "oman_saved",    label: "Saved Merchants",      group: "Oman Intelligence", roles: ["admin", "oman_bd", "global_bd"], d: "M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" },
+    { id: "oman_malls",    label: "Malls Profile",        group: "Oman Intelligence", roles: ["admin", "oman_bd", "global_bd", "viewer"], d: "M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4zM3 6h18M16 10a4 4 0 01-8 0" },
+    { id: "oman_pipeline", label: "Acquisition Pipeline", group: "Oman Intelligence", roles: ["admin", "oman_bd", "global_bd", "viewer"], d: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" },
+    { id: "support",  label: "Support Overview",     group: "CRM & Support",    roles: ["admin", "crm_lead"], d: "M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" },
+    { id: "agents",   label: "Agent Performance",    group: "CRM & Support",    roles: ["admin", "crm_lead"], d: "M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" },
+    { id: "tickets",  label: "Ticket Explorer",      group: "CRM & Support",    roles: ["admin", "crm_lead"], d: "M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8zM14 2v6h6M16 13H8M16 17H8M10 9H8" },
+    { id: "chat",     label: "Chat Review",          group: "CRM & Support",    roles: ["admin", "crm_lead"], d: "M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" },
+    { id: "admin",    label: "Admin Settings",       group: "Settings",         roles: ["admin"], d: "M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065zM15 12a3 3 0 11-6 0 3 3 0 016 0z" }
   ];
 
   const canonicalMap = useMemo(() => {
@@ -2612,7 +2765,7 @@ export default function App() {
   }} />;
   if (loadingCity) return <LoadingScreen />;
 
-  const visibleTabs = TABS.filter(t => t.id !== "agentProfile");
+  const visibleTabs = TABS.filter(t => t.id !== "agentProfile" && (userRole ? t.roles.includes(userRole) : false));
 
   return (
     <div style={{ display: "flex", height: "100vh", fontFamily: "-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif", background: C.bg, color: C.text, overflow: "hidden" }}>
@@ -2624,23 +2777,27 @@ export default function App() {
         </div>
 
         <nav style={{ padding: "10px 8px", flex: 1, overflowY: "auto" }}>
-          {["KSA Intelligence", "Oman Intelligence", "CRM & Support"].map(group => (
-            <div key={group}>
-              <div style={{ fontSize: 9, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: 1, padding: "8px 10px 4px", marginTop: group === "KSA Intelligence" ? 0 : 8 }}>
-                {group}
-              </div>
-              {visibleTabs.filter(t => t.group === group).map(({ id, label, d }) => (
-                <div key={id} onClick={() => handleTabChange(id)}
-                  style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 10px", borderRadius: 8, cursor: "pointer", fontSize: 12, color: (tab === id || (id === "agents" && tab === "agentProfile")) ? C.accent : C.sub, background: (tab === id || (id === "agents" && tab === "agentProfile")) ? C.accentL : "transparent", fontWeight: (tab === id || (id === "agents" && tab === "agentProfile")) ? 600 : 400, marginBottom: 1, transition: "all .12s" }}>
-                  <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d={d} /></svg>
-                  <span style={{ lineHeight: 1.3 }}>{label}</span>
-                  {group === "CRM & Support" && ticketsLoading && (tab === id) && (
-                    <span style={{ marginLeft: "auto", fontSize: 9, color: C.muted }}>loading…</span>
-                  )}
+          {["KSA Intelligence", "Oman Intelligence", "CRM & Support", "Settings"].map(group => {
+            const groupTabs = visibleTabs.filter(t => t.group === group);
+            if (groupTabs.length === 0) return null;
+            return (
+              <div key={group}>
+                <div style={{ fontSize: 9, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: 1, padding: "8px 10px 4px", marginTop: group === "KSA Intelligence" ? 0 : 8 }}>
+                  {group}
                 </div>
-              ))}
-            </div>
-          ))}
+                {groupTabs.map(({ id, label, d }) => (
+                  <div key={id} onClick={() => handleTabChange(id)}
+                    style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 10px", borderRadius: 8, cursor: "pointer", fontSize: 12, color: (tab === id || (id === "agents" && tab === "agentProfile")) ? C.accent : C.sub, background: (tab === id || (id === "agents" && tab === "agentProfile")) ? C.accentL : "transparent", fontWeight: (tab === id || (id === "agents" && tab === "agentProfile")) ? 600 : 400, marginBottom: 1, transition: "all .12s" }}>
+                    <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d={d} /></svg>
+                    <span style={{ lineHeight: 1.3 }}>{label}</span>
+                    {group === "CRM & Support" && ticketsLoading && (tab === id) && (
+                      <span style={{ marginLeft: "auto", fontSize: 9, color: C.muted }}>loading…</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            );
+          })}
         </nav>
 
         <div style={{ padding: "12px 16px", borderTop: `1px solid ${C.border}`, fontSize: 11, color: C.muted }}>
@@ -2669,7 +2826,9 @@ export default function App() {
             setMerchants([]); 
             setTickets([]); 
             setTicketsLoaded(false); 
+            setUserRole(null);
             localStorage.removeItem("wn_session");
+            localStorage.removeItem("wn_user_role");
           }}
             style={{ marginTop: 10, width: "100%", padding: "6px 0", background: "#F4F2EE", border: "none", borderRadius: 6, fontSize: 11, color: C.muted, cursor: "pointer" }}>
             Sign Out
@@ -2680,16 +2839,16 @@ export default function App() {
       {/* Main */}
       <main style={{ flex: 1, overflowY: "auto", padding: 24 }}>
         {tab === "macro" && <MacroTab merchants={unifiedMerchants} />}
-        {tab === "profiler" && <ProfilerTab merchants={unifiedMerchants} anonKey={anonKey} initialMerchant={selectedMerchantForProfile} tickets={tickets} userEmail={session?.user?.email} favoriteIds={favoriteIds} toggleFavorite={toggleFavorite} />}
+        {tab === "profiler" && <ProfilerTab merchants={unifiedMerchants} anonKey={anonKey} initialMerchant={selectedMerchantForProfile} tickets={tickets} userEmail={session?.user?.email} favoriteIds={favoriteIds} toggleFavorite={toggleFavorite} userRole={userRole} />}
         {tab === "saved" && <SavedMerchantsTab merchants={unifiedMerchants} favoriteIds={favoriteIds} onMerchantClick={handleMerchantClick} />}
-        {tab === "malls" && <MallsTab merchants={unifiedMerchants} onMerchantClick={handleMerchantClick} statuses={statuses} onStatusChange={handleStatusChange} />}
-        {tab === "pipeline" && <PipelineTab merchants={unifiedMerchants} onMerchantClick={handleMerchantClick} statuses={statuses} onStatusChange={handleStatusChange} />}
+        {tab === "malls" && <MallsTab merchants={unifiedMerchants} onMerchantClick={handleMerchantClick} statuses={statuses} onStatusChange={handleStatusChange} userRole={userRole} />}
+        {tab === "pipeline" && <PipelineTab merchants={unifiedMerchants} onMerchantClick={handleMerchantClick} statuses={statuses} onStatusChange={handleStatusChange} userRole={userRole} />}
         
         {tab === "oman_macro" && <MacroTab merchants={omanUnifiedMerchants} region="Oman" />}
-        {tab === "oman_profiler" && <ProfilerTab merchants={omanUnifiedMerchants} anonKey={anonKey} initialMerchant={selectedMerchantForProfile} tickets={tickets} region="Oman" userEmail={session?.user?.email} favoriteIds={favoriteIds} toggleFavorite={toggleFavorite} />}
+        {tab === "oman_profiler" && <ProfilerTab merchants={omanUnifiedMerchants} anonKey={anonKey} initialMerchant={selectedMerchantForProfile} tickets={tickets} region="Oman" userEmail={session?.user?.email} favoriteIds={favoriteIds} toggleFavorite={toggleFavorite} userRole={userRole} />}
         {tab === "oman_saved" && <SavedMerchantsTab merchants={omanUnifiedMerchants} favoriteIds={favoriteIds} onMerchantClick={handleMerchantClick} />}
-        {tab === "oman_malls" && <MallsTab merchants={omanUnifiedMerchants} onMerchantClick={handleMerchantClick} statuses={statuses} onStatusChange={handleStatusChange} region="Oman" />}
-        {tab === "oman_pipeline" && <PipelineTab merchants={omanUnifiedMerchants} onMerchantClick={handleMerchantClick} statuses={statuses} onStatusChange={handleStatusChange} region="Oman" />}
+        {tab === "oman_malls" && <MallsTab merchants={omanUnifiedMerchants} onMerchantClick={handleMerchantClick} statuses={statuses} onStatusChange={handleStatusChange} region="Oman" userRole={userRole} />}
+        {tab === "oman_pipeline" && <PipelineTab merchants={omanUnifiedMerchants} onMerchantClick={handleMerchantClick} statuses={statuses} onStatusChange={handleStatusChange} region="Oman" userRole={userRole} />}
 
         {tab === "support" && (ticketsLoading
           ? <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "60vh", color: C.muted, fontSize: 13 }}>Loading {tickets.length.toLocaleString()} tickets…</div>
@@ -2706,6 +2865,7 @@ export default function App() {
         {tab === "agentProfile" && (
           <AgentProfile agentId={selectedAgentId} tickets={tickets} onBack={() => setTab("agents")} onTicketClick={handleTicketClick} onKPIFilter={(f) => { setExplorerFilters(f); handleTabChange("tickets"); }} />
         )}
+        {tab === "admin" && userRole === "admin" && <AdminSettingsTab anonKey={anonKey} session={session} />}
       </main>
     </div>
   );

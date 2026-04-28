@@ -36,7 +36,8 @@ const modules = {
   ],
 };
 
-export default function MerchantNotes({ merchantId, authorName, anonKey }) {
+export default function MerchantNotes({ merchantId, authorName, anonKey, userRole, region = "KSA" }) {
+  const canEditNotes = userRole === 'admin' || userRole === 'global_bd' || (userRole === 'ksa_bd' && region === 'KSA') || (userRole === 'oman_bd' && region === 'Oman');
   const [notes, setNotes] = useState([]);
   const [newNote, setNewNote] = useState('');
   const [attachments, setAttachments] = useState([]);
@@ -239,7 +240,8 @@ export default function MerchantNotes({ merchantId, authorName, anonKey }) {
       
       <h3 style={styles.header}>Team Notes & Comments</h3>
       
-      <div style={styles.inputArea}>
+      {canEditNotes && (
+        <div style={styles.inputArea}>
         <div style={styles.avatarPlaceholder}>{authorName.charAt(0).toUpperCase()}</div>
         
         <div style={styles.editorBox}>
@@ -304,7 +306,7 @@ export default function MerchantNotes({ merchantId, authorName, anonKey }) {
             </button>
           </div>
         </div>
-      </div>
+      )}
 
       <div style={styles.notesList}>
         {loading && notes.length === 0 ? (
@@ -332,7 +334,7 @@ export default function MerchantNotes({ merchantId, authorName, anonKey }) {
                       </button>
                       {menuOpenId === note.id && (
                         <div style={styles.dropdownMenu} ref={menuRef}>
-                          {note.author_name === authorName && (
+                          {(note.author_name === authorName || userRole === 'admin') && (
                             <button className="note-dropdown-item" style={styles.dropdownItem} onClick={() => handleDeleteNote(note.id)}>
                               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                 <polyline points="3 6 5 6 21 6"></polyline>

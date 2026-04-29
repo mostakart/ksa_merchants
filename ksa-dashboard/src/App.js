@@ -172,8 +172,8 @@ function computeTopMalls(merchants, n = 8) {
 function KPI({ label, value, sub, color, onClick }) {
   const accent = color || C.accent;
   return (
-    <div onClick={onClick} 
-      style={{ 
+    <div onClick={onClick}
+      style={{
         background: C.white, borderRadius: 10, padding: "14px 16px", border: `1px solid ${C.border}`,
         cursor: onClick ? "pointer" : "default",
         transition: "all .12s",
@@ -320,7 +320,7 @@ function LoadingScreen() {
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh", alignItems: "center", justifyContent: "center", background: C.bg, gap: 24, textAlign: "center", padding: 20 }}>
       <WaffarhaLogo height={65} style={{ marginBottom: -5 }} />
-      
+
       <div style={{ maxWidth: 500 }}>
         <div style={{ fontSize: 32, fontWeight: 800, color: C.text, marginBottom: 8, letterSpacing: "-1px" }}>
           Nexus
@@ -335,7 +335,7 @@ function LoadingScreen() {
           <div key={d} style={{ width: 8, height: 8, borderRadius: "50%", background: C.accent, animation: "bounce .7s infinite alternate", animationDelay: `${d}ms` }} />
         ))}
       </div>
-      
+
       <style>{`@keyframes bounce { to { transform:translateY(-6px);opacity:.3; } }`}</style>
     </div>
   );
@@ -920,10 +920,10 @@ function TicketExplorerTab({ tickets, onTicketClick, initialFilters = {} }) {
           </svg>
         </div>
         {[["Agent", agents, agent, setAgent], ["Channel", channels, channel, setChannel], ["Reason", reasons.slice(0, 30), reason, setReason],
-          ["Status", ["All", "Open", "Closed", "Resolved"], status, setStatus],
-          ["AI Signal", aiOpts, aiFilter, setAiFilter],
-          ["CSAT", ["All", "Good", "Okay", "Bad"], happiness, setHappiness],
-          ["SLA", slaOpts, slaF, setSlaF],
+        ["Status", ["All", "Open", "Closed", "Resolved"], status, setStatus],
+        ["AI Signal", aiOpts, aiFilter, setAiFilter],
+        ["CSAT", ["All", "Good", "Okay", "Bad"], happiness, setHappiness],
+        ["SLA", slaOpts, slaF, setSlaF],
         ].map(([label, opts, val, fn]) => (
           <select key={label} value={val} onChange={e => fn(e.target.value)}
             style={{ padding: "8px 10px", border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 12, background: C.white, color: C.text, cursor: "pointer" }}>
@@ -1031,9 +1031,9 @@ function TicketExplorerTab({ tickets, onTicketClick, initialFilters = {} }) {
             )}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16 }}>
               {[["Quality Score", `${selected.overallQualityScore}/10`, selected.overallQualityScore >= 7 ? "#10B981" : "#EF4444"],
-                ["Sentiment Shift", selected.sentimentShift || "Neutral", null],
-                ["Issue Type", selected.issueType || "Unknown", C.accent],
-                ["Root Cause", selected.rootCause || "Unknown", null],
+              ["Sentiment Shift", selected.sentimentShift || "Neutral", null],
+              ["Issue Type", selected.issueType || "Unknown", C.accent],
+              ["Root Cause", selected.rootCause || "Unknown", null],
               ].map(([l, v, c]) => (
                 <div key={l} style={{ background: "#F9F8F7", padding: "8px 10px", borderRadius: 8 }}>
                   <div style={{ fontSize: 9, color: C.muted, textTransform: "uppercase" }}>{l}</div>
@@ -1044,11 +1044,11 @@ function TicketExplorerTab({ tickets, onTicketClick, initialFilters = {} }) {
             <div style={{ marginBottom: 16 }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: .5, marginBottom: 8 }}>Quality Parameters</div>
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                {[["Empathy Score", selected.empathyScore, 10],["Knowledge Accuracy", selected.knowledgeAccuracy, 10],
-                  ["Policy Compliance", selected.policyCompliance ? "✓ Yes" : "✗ No", null],
-                  ["One-Touch Resolution", selected.oneTouchResolutionAI ? "✓ Yes" : "✗ No", null],
-                  ["Fraud Suspicion", selected.fraudSuspicion ? "⚠️ Yes" : "No", null],
-                  ["Payment Blocker", selected.isPaymentBlocker ? "🚫 Yes" : "No", null],
+                {[["Empathy Score", selected.empathyScore, 10], ["Knowledge Accuracy", selected.knowledgeAccuracy, 10],
+                ["Policy Compliance", selected.policyCompliance ? "✓ Yes" : "✗ No", null],
+                ["One-Touch Resolution", selected.oneTouchResolutionAI ? "✓ Yes" : "✗ No", null],
+                ["Fraud Suspicion", selected.fraudSuspicion ? "⚠️ Yes" : "No", null],
+                ["Payment Blocker", selected.isPaymentBlocker ? "🚫 Yes" : "No", null],
                 ].map(([l, v, max]) => (
                   <div key={l} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 11, padding: "2px 0" }}>
                     <span style={{ color: C.sub }}>{l}</span>
@@ -1065,8 +1065,8 @@ function TicketExplorerTab({ tickets, onTicketClick, initialFilters = {} }) {
             )}
             <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 12 }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: .5, marginBottom: 8 }}>Basic Information</div>
-              {[["Merchant", selected.merchantName],["Reason", selected.reason],["Subject", selected.subject],
-                ["Created", (selected.createdTime || "").slice(0, 16).replace("T", " ")],
+              {[["Merchant", selected.merchantName], ["Reason", selected.reason], ["Subject", selected.subject],
+              ["Created", (selected.createdTime || "").slice(0, 16).replace("T", " ")],
               ].map(([l, v]) => (
                 <div key={l} style={{ marginBottom: 6 }}>
                   <div style={{ fontSize: 9, color: C.muted }}>{l}</div>
@@ -1356,11 +1356,11 @@ function ProfilerTab({ merchants, anonKey, initialMerchant, tickets, region = "K
                   <span style={{ fontWeight: 500 }}>{m.Merchant}</span>
                   <div style={{ fontSize: 10, color: C.muted }}>{m.Mall} · {m.City}</div>
                 </div>
-                <span style={{ 
-                  fontSize: 10, fontWeight: 700, 
-                  color: m.Rating >= 4 ? "#16A34A" : m.Rating >= 3 ? "#D97706" : C.accent, 
-                  background: m.Rating >= 4 ? "#F0FDF4" : m.Rating >= 3 ? "#FFFBEB" : C.accentL, 
-                  padding: "2px 6px", borderRadius: 5, display: "flex", alignItems: "center", gap: 3, whiteSpace: "nowrap" 
+                <span style={{
+                  fontSize: 10, fontWeight: 700,
+                  color: m.Rating >= 4 ? "#16A34A" : m.Rating >= 3 ? "#D97706" : C.accent,
+                  background: m.Rating >= 4 ? "#F0FDF4" : m.Rating >= 3 ? "#FFFBEB" : C.accentL,
+                  padding: "2px 6px", borderRadius: 5, display: "flex", alignItems: "center", gap: 3, whiteSpace: "nowrap"
                 }}>
                   ★ {m.Rating}
                 </span>
@@ -1381,7 +1381,7 @@ function ProfilerTab({ merchants, anonKey, initialMerchant, tickets, region = "K
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 12, marginLeft: 16 }}>
                   {favoriteIds && toggleFavorite && (
-                    <button 
+                    <button
                       onClick={() => toggleFavorite(selected.Merchant)}
                       style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 18, padding: 0, outline: 'none', transition: 'transform 0.1s' }}
                       onMouseDown={e => e.currentTarget.style.transform = 'scale(0.9)'}
@@ -1392,7 +1392,7 @@ function ProfilerTab({ merchants, anonKey, initialMerchant, tickets, region = "K
                       {favoriteIds.has(selected.Merchant) ? '❤️' : '🤍'}
                     </button>
                   )}
-                  <button 
+                  <button
                     onClick={() => {
                       const text = `🏢 Merchant: ${selected.Merchant}\n📍 Location: ${selected.Mall ? selected.Mall + ', ' : ''}${selected.City}\n⭐ Rating: ${selected.Rating} ★ (${selected.Reviews} reviews)\n🏷️ Category: ${selected.Category}\n\nView details in Waffarha Nexus`;
                       navigator.clipboard.writeText(text);
@@ -1401,7 +1401,7 @@ function ProfilerTab({ merchants, anonKey, initialMerchant, tickets, region = "K
                     style={{ background: '#F3F4F6', border: '1px solid #E5E7EB', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 600, padding: '4px 10px', color: '#4B5563', display: 'flex', alignItems: 'center', gap: 6 }}
                     title="Share Merchant"
                   >
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" /><polyline points="16 6 12 2 8 6" /><line x1="12" y1="2" x2="12" y2="15" /></svg>
                     Share
                   </button>
                   <span style={{
@@ -1445,10 +1445,10 @@ function ProfilerTab({ merchants, anonKey, initialMerchant, tickets, region = "K
             </Card>
           </div>
           <div style={{ marginTop: 16 }}>
-            <MerchantNotes 
-              merchantId={selected.Merchant} 
-              authorName={userEmail || localStorage.getItem("wn_email") || "Team Member"} 
-              anonKey={anonKey} 
+            <MerchantNotes
+              merchantId={selected.Merchant}
+              authorName={userEmail || localStorage.getItem("wn_email") || "Team Member"}
+              anonKey={anonKey}
               userRole={userRole}
               region={region}
             />
@@ -1499,7 +1499,7 @@ function PipelineTab({ merchants, onMerchantClick, statuses, onStatusChange, reg
     if (subCat !== "All" && m.SubCategory !== subCat) return false;
     if (price !== "All" && m.AvgPrice !== price) return false;
     if (hours !== "All" && m.HoursCategory !== hours) return false;
-    
+
     if (statusFilter !== "All") {
       const key = `${m.Merchant}|${m.Mall || ""}`;
       const st = statuses[key] || "Uncontacted";
@@ -1614,16 +1614,16 @@ function PipelineTab({ merchants, onMerchantClick, statuses, onStatusChange, reg
                     <td style={{ padding: "9px 12px", fontSize: 11, color: C.muted, maxWidth: 110, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.Mall}</td>
                     <td style={{ padding: "9px 12px", fontSize: 11, color: C.sub, maxWidth: 110, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.Category === "Uncategorized" ? "—" : m.Category}</td>
                     <td style={{ padding: "9px 12px", fontWeight: 500, fontSize: 11, color: m.Priority.toLowerCase().includes("high") ? C.accent : m.Priority.toLowerCase().includes("medium") ? "#D97706" : m.Priority.toLowerCase().includes("low") ? "#16A34A" : C.muted }}>{m.Priority}</td>
-                     <td style={{ padding: "9px 12px" }}>
-                       <span style={{ 
-                         fontSize: 10, fontWeight: 700, 
-                         color: m.Rating >= 4 ? "#16A34A" : m.Rating >= 3 ? "#D97706" : C.accent, 
-                         background: m.Rating >= 4 ? "#F0FDF4" : m.Rating >= 3 ? "#FFFBEB" : C.accentL, 
-                         padding: "2px 6px", borderRadius: 5, display: "inline-flex", alignItems: "center", gap: 3, whiteSpace: "nowrap" 
-                       }}>
-                         ★ {m.Rating}
-                       </span>
-                     </td>
+                    <td style={{ padding: "9px 12px" }}>
+                      <span style={{
+                        fontSize: 10, fontWeight: 700,
+                        color: m.Rating >= 4 ? "#16A34A" : m.Rating >= 3 ? "#D97706" : C.accent,
+                        background: m.Rating >= 4 ? "#F0FDF4" : m.Rating >= 3 ? "#FFFBEB" : C.accentL,
+                        padding: "2px 6px", borderRadius: 5, display: "inline-flex", alignItems: "center", gap: 3, whiteSpace: "nowrap"
+                      }}>
+                        ★ {m.Rating}
+                      </span>
+                    </td>
                     <td style={{ padding: "9px 12px" }}>{m.Reviews >= 1000 ? `${(m.Reviews / 1000).toFixed(1)}k` : m.Reviews}</td>
                     <td style={{ padding: "9px 12px", color: C.muted }}>{m.AvgPrice || "—"}</td>
                     <td style={{ padding: "9px 12px", color: C.muted, fontSize: 11, maxWidth: 150, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={m.OpeningHours}>{m.OpeningHours || "—"}</td>
@@ -1692,7 +1692,7 @@ function SavedMerchantsTab({ merchants, favoriteIds, onMerchantClick }) {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 16 }}>
           {savedMerchants.map((m, i) => (
             <Card key={i} style={{ padding: 20, cursor: "pointer", transition: "transform 0.2s, box-shadow 0.2s" }} >
-              <div 
+              <div
                 onClick={() => onMerchantClick(m)}
                 onMouseEnter={e => { e.currentTarget.parentElement.style.transform = "translateY(-4px)"; e.currentTarget.parentElement.style.boxShadow = "0 10px 25px rgba(0,0,0,0.05)"; }}
                 onMouseLeave={e => { e.currentTarget.parentElement.style.transform = "translateY(0)"; e.currentTarget.parentElement.style.boxShadow = "none"; }}
@@ -1702,16 +1702,16 @@ function SavedMerchantsTab({ merchants, favoriteIds, onMerchantClick }) {
                     <div style={{ fontSize: 18, fontWeight: 700, color: C.text, lineHeight: 1.3 }}>{m.Merchant}</div>
                     <div style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>{m.Mall ? `${m.Mall} · ` : ''}{m.City}</div>
                   </div>
-                  <span style={{ 
-                    fontSize: 12, fontWeight: 700, 
-                    color: m.Rating >= 4 ? "#16A34A" : m.Rating >= 3 ? "#D97706" : C.accent, 
-                    background: m.Rating >= 4 ? "#F0FDF4" : m.Rating >= 3 ? "#FFFBEB" : C.accentL, 
-                    padding: "4px 10px", borderRadius: 8, display: "flex", alignItems: "center", gap: 4, whiteSpace: "nowrap" 
+                  <span style={{
+                    fontSize: 12, fontWeight: 700,
+                    color: m.Rating >= 4 ? "#16A34A" : m.Rating >= 3 ? "#D97706" : C.accent,
+                    background: m.Rating >= 4 ? "#F0FDF4" : m.Rating >= 3 ? "#FFFBEB" : C.accentL,
+                    padding: "4px 10px", borderRadius: 8, display: "flex", alignItems: "center", gap: 4, whiteSpace: "nowrap"
                   }}>
                     ★ {m.Rating}
                   </span>
                 </div>
-                
+
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16, marginTop: 16 }}>
                   <div style={{ background: C.bg, padding: "8px 12px", borderRadius: 8 }}>
                     <div style={{ fontSize: 10, color: C.muted, textTransform: "uppercase", letterSpacing: 0.5 }}>Reviews</div>
@@ -2079,7 +2079,7 @@ function ChatReview({ tickets, initialTicketId, onAgentClick }) {
             <div style={{ textAlign: "center", padding: 40, color: C.muted, fontSize: 12 }}>No tickets found</div>
           )}
         </div>
-        
+
         {/* Sidebar Pagination */}
         {totalPages > 1 && (
           <div style={{ padding: "10px 12px", borderTop: `1px solid ${C.border}`, background: "#F9F8F7", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -2334,6 +2334,372 @@ function AgentProfile({ agentId, tickets, onBack, onTicketClick, onKPIFilter }) 
   );
 }
 
+/* ─── OFFER CREATION ─────────────────────────────────────────── */
+const N8N_IMPORT_URL = "https://mostafakhaleddd.app.n8n.cloud/webhook/test-offer";
+const N8N_EVAL_URL = "https://mostafakhaleddd.app.n8n.cloud/webhook/8c48a9a7-b371-4417-a4cf-baf156977fcc";
+
+function OfferCreationTab({ anonKey, session }) {
+  const [ticketId, setTicketId] = useState("");
+  const [importing, setImporting] = useState(false);
+  const [evaluating, setEvaluating] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [merchantName, setMerchantName] = useState("");
+  const [offerTitle, setOfferTitle] = useState("");
+  const [mainDesc, setMainDesc] = useState("");
+  const [options, setOptions] = useState([]);
+  const [conditions, setConditions] = useState([]);
+  const [branchesText, setBranchesText] = useState("");
+  const [aiScore, setAiScore] = useState(null);
+  const [critique, setCritique] = useState("");
+
+  // Helper to detect Arabic text for layout flipping
+  const isRTL = (text) => /[\u0600-\u06FF]/.test(text || "");
+
+  const parseN8nResponse = (text) => {
+    try { return JSON.parse(text); } catch { }
+    const m = text.match(/\{[\s\S]*\}/);
+    if (m) { try { return JSON.parse(m[0]); } catch { } }
+    throw new Error("Could not parse response from n8n");
+  };
+
+  const updateOption = (index, field, value) => {
+    const newOptions = [...options];
+    newOptions[index][field] = value;
+    setOptions(newOptions);
+  };
+
+  const toggleDeleteOption = (index) => {
+    const newOptions = [...options];
+    newOptions[index].isDeleted = !newOptions[index].isDeleted;
+    setOptions(newOptions);
+  };
+
+  const addOption = () => {
+    setOptions([...options, { title: "New Package", content: "Details...", price: "0", originalPrice: "0", discount: "0", isDeleted: false }]);
+  };
+
+  const updateCondition = (index, value) => {
+    const newConditions = [...conditions];
+    newConditions[index].text = value;
+    setConditions(newConditions);
+  };
+
+  const toggleDeleteCondition = (index) => {
+    const newConditions = [...conditions];
+    newConditions[index].isDeleted = !newConditions[index].isDeleted;
+    setConditions(newConditions);
+  };
+
+  const addCondition = () => {
+    setConditions([...conditions, { text: "New condition...", isDeleted: false }]);
+  };
+
+  const handleImport = async () => {
+    if (!ticketId.trim()) { setError("Please enter a Jira Ticket ID."); return; }
+    setImporting(true); setError(""); setSuccess(""); setAiScore(null); setCritique("");
+    try {
+      const res = await fetch(N8N_IMPORT_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ "ticket_id": ticketId.trim() }),
+      });
+      if (!res.ok) throw new Error(`Webhook error: ${res.status}`);
+      const data = parseN8nResponse(await res.text());
+      setMerchantName(data.merchant_name || "");
+      setOfferTitle(data.main_deal_title || "");
+      setMainDesc(data.main_description || "");
+      setBranchesText(data.branches_text || "");
+      
+      if (Array.isArray(data.buy_options)) {
+        setOptions(data.buy_options.map(o => ({
+          title: o.option_title || "",
+          content: o.option_content || "",
+          price: o.price_final || "",
+          originalPrice: o.price_original || "",
+          discount: o.discount_percentage || "",
+          isDeleted: false
+        })));
+      } else {
+        setOptions([]);
+      }
+      setConditions(Array.isArray(data.terms_list) 
+        ? data.terms_list.map(t => ({ text: t, isDeleted: false })) 
+        : (data.terms_list ? [{ text: data.terms_list, isDeleted: false }] : []));
+      setSuccess("✓ Offer imported successfully from Jira.");
+    } catch (e) { setError("Import failed: " + e.message); }
+    setImporting(false);
+  };
+
+  const handleEvaluate = async () => {
+    if (!offerTitle) { setError("Please import or fill in offer data first."); return; }
+    setEvaluating(true); setError("");
+    const activeOptions = options.filter(o => !o.isDeleted);
+    const activeConditions = conditions.filter(c => !c.isDeleted).map(c => c.text);
+    try {
+      const res = await fetch(N8N_EVAL_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: offerTitle, description: mainDesc, branches: branchesText, options: JSON.stringify(activeOptions), terms: JSON.stringify(activeConditions) }),
+      });
+      if (!res.ok) throw new Error(`Evaluate error: ${res.status}`);
+      const raw = parseN8nResponse(await res.text());
+      const data = typeof raw.output === "string" ? parseN8nResponse(raw.output) : raw;
+      setAiScore(data.qa_score ?? data.quality_score ?? null);
+      setCritique(data.critique_summary || data.critique || "");
+    } catch (e) { setError("Evaluation failed: " + e.message); }
+    setEvaluating(false);
+  };
+
+  const handleSave = async () => {
+    if (!merchantName || !offerTitle) { setError("Merchant name and offer title are required."); return; }
+    setSaving(true); setError("");
+    const activeOptions = options.filter(o => !o.isDeleted);
+    const activeConditions = conditions.filter(c => !c.isDeleted).map(c => c.text);
+    try {
+      const res = await fetch(`${SB_URL}/rest/v1/offer_drafts`, {
+        method: "POST",
+        headers: { ...sbH(anonKey, session.access_token), "Prefer": "return=minimal" },
+        body: JSON.stringify({ ticket_id: ticketId.trim(), merchant_name: merchantName, title: offerTitle, options: JSON.stringify(activeOptions), conditions: JSON.stringify(activeConditions), created_by: session.user.email }),
+      });
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.message || `Supabase error: ${res.status}`); }
+      setSuccess("✓ Offer draft saved to database successfully.");
+    } catch (e) { setError("Save failed: " + e.message); }
+    setSaving(false);
+  };
+
+  const scoreColor = aiScore === null ? C.muted : aiScore >= 80 ? "#22c55e" : aiScore >= 60 ? "#f59e0b" : "#ef4444";
+
+  const inp = {
+    width: "100%", padding: "10px 12px", border: `1px solid ${C.border}`, borderRadius: 8,
+    background: "#fff", fontSize: 13, color: C.text, outline: "none",
+    transition: "border-color .15s", boxSizing: "border-box", fontFamily: "inherit",
+    textAlign: "start",
+  };
+
+  const lbl = { display: "block", fontSize: 11, fontWeight: 600, color: C.sub, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6, textAlign: "left" };
+
+  const Spinner = ({ dark }) => (
+    <span style={{ display: "inline-block", width: 12, height: 12, border: `2px solid ${dark ? "rgba(0,0,0,0.15)" : "rgba(255,255,255,0.3)"}`, borderTopColor: dark ? C.text : "#fff", borderRadius: "50%", animation: "ocSpin .7s linear infinite" }} />
+  );
+
+  return (
+    <div>
+      <style>{`
+        @keyframes ocSpin { to { transform: rotate(360deg); } }
+        .ticket-edge {
+          position: absolute; left: 0; top: 0; bottom: 0; width: 32px;
+          background-color: ${C.accent};
+          background-image: radial-gradient(circle at 0px 10px, #fff 6px, transparent 7px);
+          background-size: 32px 20px;
+        }
+      `}</style>
+
+      {/* Header */}
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <h2 style={{ fontSize: 24, fontWeight: 700, margin: "0 0 4px", letterSpacing: "-.5px" }}>Offer Creation</h2>
+          {aiScore !== null && (
+            <div style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 38, height: 38, borderRadius: "50%", background: scoreColor, color: "#fff", fontSize: 13, fontWeight: 800, boxShadow: `0 2px 8px ${scoreColor}44` }}>{aiScore}</div>
+          )}
+        </div>
+        <p style={{ margin: 0, color: C.muted, fontSize: 13 }}>AI-powered offer drafting from Jira tickets · Waffarha Content Studio</p>
+      </div>
+
+      {/* Toast messages */}
+      {error && (
+        <div style={{ marginBottom: 16, padding: "12px 16px", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, color: "#dc2626", fontSize: 13, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span>{error}</span>
+          <button onClick={() => setError("")} style={{ background: "none", border: "none", cursor: "pointer", color: "#dc2626", fontWeight: 700, fontSize: 18, lineHeight: 1, padding: "0 4px" }}>×</button>
+        </div>
+      )}
+      {success && (
+        <div style={{ marginBottom: 16, padding: "12px 16px", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 8, color: "#16a34a", fontSize: 13, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span>{success}</span>
+          <button onClick={() => setSuccess("")} style={{ background: "none", border: "none", cursor: "pointer", color: "#16a34a", fontWeight: 700, fontSize: 18, lineHeight: 1, padding: "0 4px" }}>×</button>
+        </div>
+      )}
+
+      {/* 2-column layout */}
+      <div style={{ display: "grid", gridTemplateColumns: "320px 1fr", gap: 20, alignItems: "start" }}>
+
+        {/* LEFT column */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+
+          {/* Import card */}
+          <Card>
+            <h3 style={{ fontSize: 14, fontWeight: 600, margin: "0 0 16px" }}>Import from Jira</h3>
+            <label style={lbl}>Ticket ID</label>
+            <input dir="auto" value={ticketId} onChange={e => setTicketId(e.target.value)} onKeyDown={e => e.key === "Enter" && handleImport()} placeholder="e.g. GPT-6673" style={inp} />
+            <button
+              onClick={handleImport} disabled={importing}
+              style={{ marginTop: 14, width: "100%", padding: "10px 0", background: C.accent, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: importing ? "not-allowed" : "pointer", opacity: importing ? 0.7 : 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
+            >
+              {importing ? <><Spinner />Importing…</> : "Import Offer Data"}
+            </button>
+          </Card>
+
+          {/* Photo gallery placeholder */}
+          <Card>
+            <h3 style={{ fontSize: 14, fontWeight: 600, margin: "0 0 16px" }}>Merchant Photos</h3>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              {[1, 2, 3, 4].map(i => (
+                <div key={i} style={{ aspectRatio: "4/3", borderRadius: 8, background: "#F9F8F7", border: `1px dashed ${C.border}`, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 4 }}>
+                  <span style={{ fontSize: 18, opacity: 0.2 }}>📷</span>
+                  <span style={{ fontSize: 9, color: C.muted }}>Photo {i}</span>
+                </div>
+              ))}
+            </div>
+            <p style={{ margin: "12px 0 0", fontSize: 11, color: C.muted, textAlign: "center" }}>Gallery integration coming soon</p>
+          </Card>
+
+          {/* Critique card (visible after evaluate) */}
+          {critique && (
+            <Card style={{ background: "#FEFCE8", borderColor: "#FEF08A" }}>
+              <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 10, color: "#854D0E" }}>AI Critique</h3>
+              <p dir="auto" style={{ margin: 0, fontSize: 12, color: "#713F12", lineHeight: 1.6, whiteSpace: "pre-line", textAlign: "start" }}>{critique}</p>
+            </Card>
+          )}
+
+        </div>
+
+        {/* RIGHT column — Offer form */}
+        <Card>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+            <h3 style={{ fontSize: 14, fontWeight: 600, margin: 0 }}>Offer Draft</h3>
+            {aiScore !== null && (
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontSize: 11, color: C.muted }}>Quality Score:</span>
+                <span style={{ fontWeight: 700, color: scoreColor }}>{aiScore}%</span>
+              </div>
+            )}
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <div>
+              <label style={lbl}>Merchant Name</label>
+              <input dir="auto" value={merchantName} onChange={e => setMerchantName(e.target.value)} placeholder="Merchant name..." style={inp} />
+            </div>
+            <div>
+              <label style={lbl}>Offer Title</label>
+              <input dir="auto" value={offerTitle} onChange={e => setOfferTitle(e.target.value)} placeholder="Main deal title..." style={inp} />
+            </div>
+            <div>
+              <label style={lbl}>Description</label>
+              <textarea dir="auto" value={mainDesc} onChange={e => setMainDesc(e.target.value)} placeholder="Main offer description..." rows={3} style={{ ...inp, resize: "vertical", lineHeight: 1.6 }} />
+            </div>
+
+            {/* OPTIONS SECTION */}
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                <label style={lbl}>Options & Packages</label>
+                <button onClick={addOption} style={{ background: "none", border: `1px solid ${C.accent}`, color: C.accent, borderRadius: 6, padding: "2px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>+ Add Option</button>
+              </div>
+              
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {options.map((opt, idx) => {
+                  const ar = isRTL(opt.title) || isRTL(opt.content);
+                  return (
+                    <div key={idx} style={{ 
+                      position: "relative", 
+                      padding: ar ? "16px 48px 16px 16px" : "16px 16px 16px 48px", 
+                      border: `1px dashed ${opt.isDeleted ? "#e5e7eb" : C.border}`, 
+                      borderRadius: 12, 
+                      background: opt.isDeleted ? "#f9fafb" : "#fff", 
+                      overflow: "hidden",
+                      opacity: opt.isDeleted ? 0.6 : 1,
+                      filter: opt.isDeleted ? "grayscale(1)" : "none",
+                      transition: "all 0.2s"
+                    }}>
+                      <div className="ticket-edge" style={{ left: ar ? "auto" : 0, right: ar ? 0 : "auto", transform: ar ? "scaleX(-1)" : "none" }} />
+                      <button 
+                        onClick={() => toggleDeleteOption(idx)} 
+                        style={{ position: "absolute", top: 8, right: ar ? "auto" : 8, left: ar ? 8 : "auto", background: opt.isDeleted ? "#f3f4f6" : "none", border: "none", color: opt.isDeleted ? C.accent : "#ef4444", cursor: "pointer", fontSize: opt.isDeleted ? 10 : 16, fontWeight: 700, borderRadius: 4, padding: opt.isDeleted ? "2px 6px" : 0 }}
+                      >
+                        {opt.isDeleted ? "UNDO" : "×"}
+                      </button>
+                      
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 140px", gap: 16, direction: ar ? "rtl" : "ltr", textAlign: "start" }}>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                          <input dir="auto" value={opt.title} onChange={e => updateOption(idx, "title", e.target.value)} placeholder="Option Title" style={{ ...inp, fontWeight: 700, border: "none", padding: 0, fontSize: 15, background: "transparent" }} />
+                          <textarea dir="auto" value={opt.content} onChange={e => updateOption(idx, "content", e.target.value)} placeholder="Details..." rows={2} style={{ ...inp, border: "none", padding: 0, color: C.muted, fontSize: 12, resize: "none", background: "transparent" }} />
+                        </div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: ar ? "flex-start" : "flex-end", justifyContent: "center" }}>
+                          <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
+                            <span style={{ fontSize: 18, fontWeight: 800, color: C.accent }}>{opt.price}</span>
+                            <span style={{ fontSize: 12, fontWeight: 700, color: C.accent, marginLeft: ar ? 8 : 0, marginRight: ar ? 0 : 8 }}>EGP</span>
+                            <span style={{ fontSize: 12, color: C.muted, textDecoration: "line-through" }}>{opt.originalPrice}</span>
+                          </div>
+                          <div style={{ display: "flex", gap: 8 }}>
+                             <input value={opt.price} onChange={e => updateOption(idx, "price", e.target.value)} placeholder="Now" style={{ ...inp, width: 60, padding: "4px 8px", fontSize: 11 }} />
+                             <input value={opt.originalPrice} onChange={e => updateOption(idx, "originalPrice", e.target.value)} placeholder="Was" style={{ ...inp, width: 60, padding: "4px 8px", fontSize: 11 }} />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* TERMS SECTION */}
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                <label style={lbl}>Terms & Conditions</label>
+                <button onClick={addCondition} style={{ background: "none", border: `1px solid ${C.accent}`, color: C.accent, borderRadius: 6, padding: "2px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>+ Add Term</button>
+              </div>
+              
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {conditions.map((term, idx) => {
+                  const ar = isRTL(term.text);
+                  return (
+                    <div key={idx} style={{ 
+                      display: "flex", 
+                      alignItems: "center", 
+                      gap: 12, 
+                      flexDirection: ar ? "row-reverse" : "row",
+                      opacity: term.isDeleted ? 0.5 : 1,
+                      filter: term.isDeleted ? "grayscale(1)" : "none",
+                      transition: "all 0.2s"
+                    }}>
+                      <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#D1D5DB", flexShrink: 0 }} />
+                      <input dir="auto" value={term.text} onChange={e => updateCondition(idx, e.target.value)} placeholder="Condition..." style={{ ...inp, border: "none", padding: "4px 0", fontSize: 13, background: "transparent", textAlign: "start" }} />
+                      <button 
+                        onClick={() => toggleDeleteCondition(idx)} 
+                        style={{ background: term.isDeleted ? "#f3f4f6" : "none", border: "none", color: term.isDeleted ? C.accent : "#ef4444", cursor: "pointer", fontSize: term.isDeleted ? 10 : 16, fontWeight: 700, padding: "2px 8px", borderRadius: 4 }}
+                      >
+                        {term.isDeleted ? "UNDO" : "×"}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Action buttons */}
+          <div style={{ display: "flex", gap: 12, marginTop: 24, justifyContent: "flex-end" }}>
+            <button
+              onClick={handleEvaluate} disabled={evaluating || !offerTitle}
+              style={{ padding: "10px 20px", background: "#fff", color: C.text, border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: (evaluating || !offerTitle) ? "not-allowed" : "pointer", opacity: (evaluating || !offerTitle) ? 0.5 : 1, display: "inline-flex", alignItems: "center", gap: 8 }}
+            >
+              {evaluating ? <><Spinner dark />Evaluating…</> : "Evaluate with AI"}
+            </button>
+            <button
+              onClick={handleSave} disabled={saving || !merchantName || !offerTitle}
+              style={{ padding: "10px 24px", background: "#1A1A1A", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: (saving || !merchantName || !offerTitle) ? "not-allowed" : "pointer", opacity: (saving || !merchantName || !offerTitle) ? 0.5 : 1, display: "inline-flex", alignItems: "center", gap: 8 }}
+            >
+              {saving ? <><Spinner />Saving…</> : "Save Draft"}
+            </button>
+          </div>
+        </Card>
+
+      </div>
+    </div>
+  );
+}
+
 /* ─── ADMIN SETTINGS ─────────────────────────────────────────── */
 function AdminSettingsTab({ anonKey, session }) {
   const [users, setUsers] = useState([]);
@@ -2404,6 +2770,7 @@ function AdminSettingsTab({ anonKey, session }) {
               <option value="ksa_bd">KSA BD Manager</option>
               <option value="oman_bd">Oman BD Manager</option>
               <option value="crm_lead">CRM / Support Lead</option>
+              <option value="content_editor">Content Editor</option>
               <option value="viewer">Viewer (Read Only)</option>
             </select>
           </div>
@@ -2485,8 +2852,8 @@ export default function App() {
   const loadUserRole = async () => {
     if (!session) return;
     try {
-      const r = await fetch(`${SB_URL}/rest/v1/user_roles?email=eq.${encodeURIComponent(session.user.email)}`, { 
-        headers: sbH(anonKey, session.access_token) 
+      const r = await fetch(`${SB_URL}/rest/v1/user_roles?email=eq.${encodeURIComponent(session.user.email)}`, {
+        headers: sbH(anonKey, session.access_token)
       });
       if (r.ok) {
         const rows = await r.json();
@@ -2527,7 +2894,7 @@ export default function App() {
       loadAllMerchants();
       loadUserRole();
     }
-    
+
     // 2. Inactivity: Auto-logout after 30 minutes
     let timeout;
     const INACTIVITY_LIMIT = 30 * 60 * 1000; // 30 mins
@@ -2575,7 +2942,7 @@ export default function App() {
 
   async function loadAllMerchants() {
     setLoadingCity("Loading merchants...");
-    
+
     // Attempt instant load from cache
     try {
       const cachedKsa = localStorage.getItem("wn_merchants_ksa");
@@ -2589,13 +2956,13 @@ export default function App() {
           loadStatuses();
           loadFavorites();
         }
-        return; 
+        return;
       } else if (cachedKsa && cachedOman) {
         // Optimistic UI: show stale data immediately
         setMerchants(JSON.parse(cachedKsa));
         setOmanMerchants(JSON.parse(cachedOman));
       }
-    } catch(e) { console.warn("Cache read error"); }
+    } catch (e) { console.warn("Cache read error"); }
 
     const fetchCity = async (city) => {
       try {
@@ -2618,7 +2985,7 @@ export default function App() {
 
     setMerchants(flatKsa);
     setOmanMerchants(flatOman);
-    
+
     // Save to cache
     try {
       localStorage.setItem("wn_merchants_ksa", JSON.stringify(flatKsa));
@@ -2638,8 +3005,8 @@ export default function App() {
   const loadFavorites = async () => {
     if (!session) return;
     try {
-      const r = await fetch(`${SB_URL}/rest/v1/merchant_favorites?user_email=eq.${encodeURIComponent(session.user.email)}`, { 
-        headers: sbH(anonKey, session.access_token) 
+      const r = await fetch(`${SB_URL}/rest/v1/merchant_favorites?user_email=eq.${encodeURIComponent(session.user.email)}`, {
+        headers: sbH(anonKey, session.access_token)
       });
       if (!r.ok) return;
       const rows = await r.json();
@@ -2652,7 +3019,7 @@ export default function App() {
   const toggleFavorite = async (merchantId) => {
     if (!session) return;
     const isFav = favoriteIds.has(merchantId);
-    
+
     const newFavs = new Set(favoriteIds);
     if (isFav) newFavs.delete(merchantId);
     else newFavs.add(merchantId);
@@ -2704,21 +3071,22 @@ export default function App() {
   }
 
   const TABS = [
-    { id: "macro",    label: "Market Overview",      group: "KSA Intelligence", roles: ["admin", "ksa_bd", "global_bd", "viewer"], d: "M4 15l4-8 4 4 4-6 4 6" },
-    { id: "profiler", label: "Merchant Profiler",    group: "KSA Intelligence", roles: ["admin", "ksa_bd", "global_bd"], d: "M12 12c2.7 0 5-2.3 5-5s-2.3-5-5-5-5 2.3-5 5 2.3 5 5 5zm0 2c-3.3 0-10 1.7-10 5v1h20v-1c0-3.3-6.7-5-10-5z" },
-    { id: "saved",    label: "Saved Merchants",      group: "KSA Intelligence", roles: ["admin", "ksa_bd", "global_bd"], d: "M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" },
-    { id: "malls",    label: "Malls Profile",        group: "KSA Intelligence", roles: ["admin", "ksa_bd", "global_bd", "viewer"], d: "M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4zM3 6h18M16 10a4 4 0 01-8 0" },
+    { id: "macro", label: "Market Overview", group: "KSA Intelligence", roles: ["admin", "ksa_bd", "global_bd", "viewer"], d: "M4 15l4-8 4 4 4-6 4 6" },
+    { id: "profiler", label: "Merchant Profiler", group: "KSA Intelligence", roles: ["admin", "ksa_bd", "global_bd"], d: "M12 12c2.7 0 5-2.3 5-5s-2.3-5-5-5-5 2.3-5 5 2.3 5 5 5zm0 2c-3.3 0-10 1.7-10 5v1h20v-1c0-3.3-6.7-5-10-5z" },
+    { id: "saved", label: "Saved Merchants", group: "KSA Intelligence", roles: ["admin", "ksa_bd", "global_bd"], d: "M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" },
+    { id: "malls", label: "Malls Profile", group: "KSA Intelligence", roles: ["admin", "ksa_bd", "global_bd", "viewer"], d: "M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4zM3 6h18M16 10a4 4 0 01-8 0" },
     { id: "pipeline", label: "Acquisition Pipeline", group: "KSA Intelligence", roles: ["admin", "ksa_bd", "global_bd", "viewer"], d: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" },
-    { id: "oman_macro",    label: "Market Overview",      group: "Oman Intelligence", roles: ["admin", "oman_bd", "global_bd", "viewer"], d: "M4 15l4-8 4 4 4-6 4 6" },
-    { id: "oman_profiler", label: "Merchant Profiler",    group: "Oman Intelligence", roles: ["admin", "oman_bd", "global_bd"], d: "M12 12c2.7 0 5-2.3 5-5s-2.3-5-5-5-5 2.3-5 5 2.3 5 5 5zm0 2c-3.3 0-10 1.7-10 5v1h20v-1c0-3.3-6.7-5-10-5z" },
-    { id: "oman_saved",    label: "Saved Merchants",      group: "Oman Intelligence", roles: ["admin", "oman_bd", "global_bd"], d: "M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" },
-    { id: "oman_malls",    label: "Malls Profile",        group: "Oman Intelligence", roles: ["admin", "oman_bd", "global_bd", "viewer"], d: "M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4zM3 6h18M16 10a4 4 0 01-8 0" },
+    { id: "oman_macro", label: "Market Overview", group: "Oman Intelligence", roles: ["admin", "oman_bd", "global_bd", "viewer"], d: "M4 15l4-8 4 4 4-6 4 6" },
+    { id: "oman_profiler", label: "Merchant Profiler", group: "Oman Intelligence", roles: ["admin", "oman_bd", "global_bd"], d: "M12 12c2.7 0 5-2.3 5-5s-2.3-5-5-5-5 2.3-5 5 2.3 5 5 5zm0 2c-3.3 0-10 1.7-10 5v1h20v-1c0-3.3-6.7-5-10-5z" },
+    { id: "oman_saved", label: "Saved Merchants", group: "Oman Intelligence", roles: ["admin", "oman_bd", "global_bd"], d: "M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" },
+    { id: "oman_malls", label: "Malls Profile", group: "Oman Intelligence", roles: ["admin", "oman_bd", "global_bd", "viewer"], d: "M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4zM3 6h18M16 10a4 4 0 01-8 0" },
     { id: "oman_pipeline", label: "Acquisition Pipeline", group: "Oman Intelligence", roles: ["admin", "oman_bd", "global_bd", "viewer"], d: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" },
-    { id: "support",  label: "Support Overview",     group: "CRM & Support",    roles: ["admin", "crm_lead"], d: "M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" },
-    { id: "agents",   label: "Agent Performance",    group: "CRM & Support",    roles: ["admin", "crm_lead"], d: "M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" },
-    { id: "tickets",  label: "Ticket Explorer",      group: "CRM & Support",    roles: ["admin", "crm_lead"], d: "M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8zM14 2v6h6M16 13H8M16 17H8M10 9H8" },
-    { id: "chat",     label: "Chat Review",          group: "CRM & Support",    roles: ["admin", "crm_lead"], d: "M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" },
-    { id: "admin",    label: "Admin Settings",       group: "Settings",         roles: ["admin"], d: "M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065zM15 12a3 3 0 11-6 0 3 3 0 016 0z" }
+    { id: "support", label: "Support Overview", group: "CRM & Support", roles: ["admin", "crm_lead"], d: "M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" },
+    { id: "agents", label: "Agent Performance", group: "CRM & Support", roles: ["admin", "crm_lead"], d: "M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" },
+    { id: "tickets", label: "Ticket Explorer", group: "CRM & Support", roles: ["admin", "crm_lead"], d: "M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8zM14 2v6h6M16 13H8M16 17H8M10 9H8" },
+    { id: "chat", label: "Chat Review", group: "CRM & Support", roles: ["admin", "crm_lead"], d: "M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" },
+    { id: "admin", label: "Admin Settings", group: "Settings", roles: ["admin"], d: "M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065zM15 12a3 3 0 11-6 0 3 3 0 016 0z" },
+    { id: "offer_creation", label: "Offer Creation", group: "Content & Offers", roles: ["admin", "content_editor"], d: "M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" },
   ];
 
   const canonicalMap = useMemo(() => {
@@ -2757,11 +3125,11 @@ export default function App() {
   ], [statsSource]);
 
   if (!anonKey) return <SetupScreen onSetup={setAnonKey} />;
-  if (!session) return <LoginScreen anonKey={anonKey} onLogin={(s) => { 
-    setSession(s); 
+  if (!session) return <LoginScreen anonKey={anonKey} onLogin={(s) => {
+    setSession(s);
     if (s) {
       localStorage.setItem("wn_session", JSON.stringify(s));
-      logAudit(anonKey, s.access_token, s.user.id, "login", "auth"); 
+      logAudit(anonKey, s.access_token, s.user.id, "login", "auth");
     }
   }} />;
   if (loadingCity) return <LoadingScreen />;
@@ -2778,7 +3146,7 @@ export default function App() {
         </div>
 
         <nav style={{ padding: "10px 8px", flex: 1, overflowY: "auto" }}>
-          {["KSA Intelligence", "Oman Intelligence", "CRM & Support", "Settings"].map(group => {
+          {["KSA Intelligence", "Oman Intelligence", "CRM & Support", "Content & Offers", "Settings"].map(group => {
             const groupTabs = visibleTabs.filter(t => t.group === group);
             if (groupTabs.length === 0) return null;
             return (
@@ -2822,11 +3190,11 @@ export default function App() {
               ))}
             </>
           )}
-          <button onClick={() => { 
-            setSession(null); 
-            setMerchants([]); 
-            setTickets([]); 
-            setTicketsLoaded(false); 
+          <button onClick={() => {
+            setSession(null);
+            setMerchants([]);
+            setTickets([]);
+            setTicketsLoaded(false);
             setUserRole(null);
             localStorage.removeItem("wn_session");
             localStorage.removeItem("wn_user_role");
@@ -2844,7 +3212,7 @@ export default function App() {
         {tab === "saved" && <SavedMerchantsTab merchants={unifiedMerchants} favoriteIds={favoriteIds} onMerchantClick={handleMerchantClick} />}
         {tab === "malls" && <MallsTab merchants={unifiedMerchants} onMerchantClick={handleMerchantClick} statuses={statuses} onStatusChange={handleStatusChange} userRole={userRole} />}
         {tab === "pipeline" && <PipelineTab merchants={unifiedMerchants} onMerchantClick={handleMerchantClick} statuses={statuses} onStatusChange={handleStatusChange} userRole={userRole} />}
-        
+
         {tab === "oman_macro" && <MacroTab merchants={omanUnifiedMerchants} region="Oman" />}
         {tab === "oman_profiler" && <ProfilerTab merchants={omanUnifiedMerchants} anonKey={anonKey} initialMerchant={selectedMerchantForProfile} tickets={tickets} region="Oman" userEmail={session?.user?.email} favoriteIds={favoriteIds} toggleFavorite={toggleFavorite} userRole={userRole} />}
         {tab === "oman_saved" && <SavedMerchantsTab merchants={omanUnifiedMerchants} favoriteIds={favoriteIds} onMerchantClick={handleMerchantClick} />}
@@ -2867,6 +3235,7 @@ export default function App() {
           <AgentProfile agentId={selectedAgentId} tickets={tickets} onBack={() => setTab("agents")} onTicketClick={handleTicketClick} onKPIFilter={(f) => { setExplorerFilters(f); handleTabChange("tickets"); }} />
         )}
         {tab === "admin" && userRole === "admin" && <AdminSettingsTab anonKey={anonKey} session={session} />}
+        {tab === "offer_creation" && <OfferCreationTab anonKey={anonKey} session={session} />}
       </main>
     </div>
   );

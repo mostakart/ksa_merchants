@@ -2859,95 +2859,26 @@ function AdminSettingsTab({ anonKey, session }) {
   const [role, setRole] = useState('viewer');
   const [saving, setSaving] = useState(false);
 
-  const fetchUsers = async () => {
-    try {
-      const res = await fetch(`${SB_URL}/rest/v1/user_roles`, { headers: sbH(anonKey, session.access_token) });
-      if (res.ok) setUsers(await res.json());
-    } catch (e) { console.error("Failed to fetch roles", e); }
-    setLoading(false);
-  };
+const TABS = [
+  { id: "macro", label: "Market Overview", group: "KSA Intelligence", roles: ["admin", "ksa_bd", "global_bd", "viewer"], d: "M4 15l4-8 4 4 4-6 4 6" },
+  { id: "profiler", label: "Merchant Profiler", group: "KSA Intelligence", roles: ["admin", "ksa_bd", "global_bd"], d: "M12 12c2.7 0 5-2.3 5-5s-2.3-5-5-5-5 2.3-5 5 2.3 5 5 5zm0 2c-3.3 0-10 1.7-10 5v1h20v-1c0-3.3-6.7-5-10-5z" },
+  { id: "saved", label: "Saved Merchants", group: "KSA Intelligence", roles: ["admin", "ksa_bd", "global_bd"], d: "M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" },
+  { id: "malls", label: "Malls Profile", group: "KSA Intelligence", roles: ["admin", "ksa_bd", "global_bd", "viewer"], d: "M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4zM3 6h18M16 10a4 4 0 01-8 0" },
+  { id: "pipeline", label: "Acquisition Pipeline", group: "KSA Intelligence", roles: ["admin", "ksa_bd", "global_bd", "viewer"], d: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" },
+  { id: "oman_macro", label: "Market Overview", group: "Oman Intelligence", roles: ["admin", "oman_bd", "global_bd", "viewer"], d: "M4 15l4-8 4 4 4-6 4 6" },
+  { id: "oman_profiler", label: "Merchant Profiler", group: "Oman Intelligence", roles: ["admin", "oman_bd", "global_bd"], d: "M12 12c2.7 0 5-2.3 5-5s-2.3-5-5-5-5 2.3-5 5 2.3 5 5 5zm0 2c-3.3 0-10 1.7-10 5v1h20v-1c0-3.3-6.7-5-10-5z" },
+  { id: "oman_saved", label: "Saved Merchants", group: "Oman Intelligence", roles: ["admin", "oman_bd", "global_bd"], d: "M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" },
+  { id: "oman_malls", label: "Malls Profile", group: "Oman Intelligence", roles: ["admin", "oman_bd", "global_bd", "viewer"], d: "M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4zM3 6h18M16 10a4 4 0 01-8 0" },
+  { id: "oman_pipeline", label: "Acquisition Pipeline", group: "Oman Intelligence", roles: ["admin", "oman_bd", "global_bd", "viewer"], d: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" },
+  { id: "support", label: "Support Overview", group: "CRM & Support", roles: ["admin", "crm_lead"], d: "M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" },
+  { id: "agents", label: "Agent Performance", group: "CRM & Support", roles: ["admin", "crm_lead"], d: "M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" },
+  { id: "tickets", label: "Ticket Explorer", group: "CRM & Support", roles: ["admin", "crm_lead"], d: "M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8zM14 2v6h6M16 13H8M16 17H8M10 9H8" },
+  { id: "chat", label: "Chat Review", group: "CRM & Support", roles: ["admin", "crm_lead"], d: "M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" },
+  { id: "admin", label: "Admin Settings", group: "Settings", roles: ["admin"], d: "M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065zM15 12a3 3 0 11-6 0 3 3 0 016 0z" },
+  { id: "offer_creation", label: "Offer Creation", group: "Content & Offers", roles: ["admin", "content_editor"], d: "M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" },
+];
 
-  useEffect(() => { fetchUsers(); }, []);
-
-  const handleSave = async (e) => {
-    e.preventDefault();
-    if (!email) return;
-    setSaving(true);
-    try {
-      await fetch(`${SB_URL}/rest/v1/user_roles`, {
-        method: "POST",
-        headers: { ...sbH(anonKey, session.access_token), "Prefer": "resolution=merge-duplicates" },
-        body: JSON.stringify({ email: email.toLowerCase(), role, updated_by: session.user.email })
-      });
-      setEmail('');
-      setRole('viewer');
-      fetchUsers();
-    } catch (e) { alert("Failed to save role: " + e.message); }
-    setSaving(false);
-  };
-
-  const handleDelete = async (targetEmail) => {
-    if (!window.confirm(`Revoke access for ${targetEmail}?`)) return;
-    try {
-      await fetch(`${SB_URL}/rest/v1/user_roles?email=eq.${encodeURIComponent(targetEmail)}`, {
-        method: "DELETE",
-        headers: sbH(anonKey, session.access_token)
-      });
-      fetchUsers();
-    } catch (e) { alert("Failed to delete role"); }
-  };
-
-  return (
-    <div style={{ maxWidth: 800, margin: "0 auto" }}>
-      <div style={{ marginBottom: 24 }}>
-        <h2 style={{ fontSize: 24, fontWeight: 700, margin: "0 0 4px", letterSpacing: "-.5px" }}>Admin Settings</h2>
-        <p style={{ margin: 0, color: C.muted, fontSize: 13 }}>Manage roles and access permissions for Nexus users.</p>
-      </div>
-
-      <Card style={{ marginBottom: 24 }}>
-        <h3 style={{ fontSize: 14, fontWeight: 600, margin: "0 0 16px" }}>Assign New Role</h3>
-        <form onSubmit={handleSave} style={{ display: "flex", gap: 12, alignItems: "flex-end" }}>
-          <div style={{ flex: 1 }}>
-            <label style={{ display: "block", fontSize: 11, fontWeight: 500, color: C.sub, marginBottom: 6, textTransform: "uppercase" }}>User Email</label>
-            <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="user@waffarha.com" required
-              style={{ width: "100%", padding: "10px 12px", border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 13, outline: "none" }} />
-          </div>
-          <div style={{ width: 200 }}>
-            <label style={{ display: "block", fontSize: 11, fontWeight: 500, color: C.sub, marginBottom: 6, textTransform: "uppercase" }}>Role</label>
-            <select value={role} onChange={e => setRole(e.target.value)}
-              style={{ width: "100%", padding: "10px 12px", border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 13, outline: "none", backgroundColor: "#fff" }}>
-              <option value="admin">Super Admin</option>
-              <option value="global_bd">Global BD Lead</option>
-              <option value="ksa_bd">KSA BD Manager</option>
-              <option value="oman_bd">Oman BD Manager</option>
-              <option value="crm_lead">CRM / Support Lead</option>
-              <option value="content_editor">Content Editor</option>
-              <option value="viewer">Viewer (Read Only)</option>
-            </select>
-          </div>
-          <button type="submit" disabled={saving} style={{ padding: "10px 24px", background: C.accent, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", height: 40 }}>
-            {saving ? "Saving..." : "Save Role"}
-          </button>
-        </form>
-      </Card>
-
-      <Card style={{ padding: 0, overflow: "hidden" }}>
-        <div style={{ padding: "16px 20px", borderBottom: `1px solid ${C.border}` }}>
-          <h3 style={{ fontSize: 14, fontWeight: 600, margin: 0 }}>Active Users</h3>
-        </div>
-        {loading ? (
-          <div style={{ padding: 40, textAlign: "center", color: C.muted, fontSize: 13 }}>Loading users...</div>
-        ) : (
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-            <thead>
-              <tr style={{ background: "#F9F8F7", borderBottom: `1px solid ${C.border}` }}>
-                <th style={{ padding: "12px 20px", textAlign: "left", color: C.sub, fontWeight: 500, fontSize: 11, textTransform: "uppercase" }}>Email</th>
-                <th style={{ padding: "12px 20px", textAlign: "left", color: C.sub, fontWeight: 500, fontSize: 11, textTransform: "uppercase" }}>Role</th>
-                <th style={{ padding: "12px 20px", textAlign: "left", color: C.sub, fontWeight: 500, fontSize: 11, textTransform: "uppercase" }}>Added</th>
-                <th style={{ padding: "12px 20px", textAlign: "right" }}></th>
-              </tr>
-            </thead>
-            <tbody>
+export default function App() {
               {users.map(u => (
                 <tr key={u.email} style={{ borderBottom: `1px solid ${C.border}` }}>
                   <td style={{ padding: "12px 20px", fontWeight: 500 }}>{u.email}</td>
@@ -3039,6 +2970,16 @@ export default function App() {
     if (session) logAudit(anonKey, session.access_token, session.user.id, "navigate", id);
     if (["support", "agents", "tickets", "chat"].includes(id)) loadTickets();
   };
+
+  // 1. Role-Based Redirection: Ensure user is on a tab they have access to
+  useEffect(() => {
+    if (!userRole) return;
+    const currentTabAllowed = TABS.find(t => t.id === tab)?.roles.includes(userRole);
+    if (!currentTabAllowed) {
+      const firstAllowed = TABS.find(t => t.roles.includes(userRole));
+      if (firstAllowed) handleTabChange(firstAllowed.id);
+    }
+  }, [userRole, tab]);
 
   useEffect(() => {
     if (session && anonKey) {
@@ -3221,24 +3162,6 @@ export default function App() {
     finally { setStatusSaving(false); }
   }
 
-  const TABS = [
-    { id: "macro", label: "Market Overview", group: "KSA Intelligence", roles: ["admin", "ksa_bd", "global_bd", "viewer"], d: "M4 15l4-8 4 4 4-6 4 6" },
-    { id: "profiler", label: "Merchant Profiler", group: "KSA Intelligence", roles: ["admin", "ksa_bd", "global_bd"], d: "M12 12c2.7 0 5-2.3 5-5s-2.3-5-5-5-5 2.3-5 5 2.3 5 5 5zm0 2c-3.3 0-10 1.7-10 5v1h20v-1c0-3.3-6.7-5-10-5z" },
-    { id: "saved", label: "Saved Merchants", group: "KSA Intelligence", roles: ["admin", "ksa_bd", "global_bd"], d: "M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" },
-    { id: "malls", label: "Malls Profile", group: "KSA Intelligence", roles: ["admin", "ksa_bd", "global_bd", "viewer"], d: "M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4zM3 6h18M16 10a4 4 0 01-8 0" },
-    { id: "pipeline", label: "Acquisition Pipeline", group: "KSA Intelligence", roles: ["admin", "ksa_bd", "global_bd", "viewer"], d: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" },
-    { id: "oman_macro", label: "Market Overview", group: "Oman Intelligence", roles: ["admin", "oman_bd", "global_bd", "viewer"], d: "M4 15l4-8 4 4 4-6 4 6" },
-    { id: "oman_profiler", label: "Merchant Profiler", group: "Oman Intelligence", roles: ["admin", "oman_bd", "global_bd"], d: "M12 12c2.7 0 5-2.3 5-5s-2.3-5-5-5-5 2.3-5 5 2.3 5 5 5zm0 2c-3.3 0-10 1.7-10 5v1h20v-1c0-3.3-6.7-5-10-5z" },
-    { id: "oman_saved", label: "Saved Merchants", group: "Oman Intelligence", roles: ["admin", "oman_bd", "global_bd"], d: "M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" },
-    { id: "oman_malls", label: "Malls Profile", group: "Oman Intelligence", roles: ["admin", "oman_bd", "global_bd", "viewer"], d: "M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4zM3 6h18M16 10a4 4 0 01-8 0" },
-    { id: "oman_pipeline", label: "Acquisition Pipeline", group: "Oman Intelligence", roles: ["admin", "oman_bd", "global_bd", "viewer"], d: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" },
-    { id: "support", label: "Support Overview", group: "CRM & Support", roles: ["admin", "crm_lead"], d: "M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" },
-    { id: "agents", label: "Agent Performance", group: "CRM & Support", roles: ["admin", "crm_lead"], d: "M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" },
-    { id: "tickets", label: "Ticket Explorer", group: "CRM & Support", roles: ["admin", "crm_lead"], d: "M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8zM14 2v6h6M16 13H8M16 17H8M10 9H8" },
-    { id: "chat", label: "Chat Review", group: "CRM & Support", roles: ["admin", "crm_lead"], d: "M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" },
-    { id: "admin", label: "Admin Settings", group: "Settings", roles: ["admin"], d: "M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065zM15 12a3 3 0 11-6 0 3 3 0 016 0z" },
-    { id: "offer_creation", label: "Offer Creation", group: "Content & Offers", roles: ["admin", "content_editor"], d: "M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" },
-  ];
 
   const canonicalMap = useMemo(() => {
     const counts = {};

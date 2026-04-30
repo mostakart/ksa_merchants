@@ -3278,7 +3278,7 @@ export default function App() {
   const unifiedMerchants = useMemo(() => merchants.map(m => ({ ...m, OriginalMerchant: m.Merchant, Merchant: canonicalMap[m.Merchant] || m.Merchant })), [merchants, canonicalMap]);
   const omanUnifiedMerchants = useMemo(() => omanMerchants.map(m => ({ ...m, OriginalMerchant: m.Merchant, Merchant: canonicalMap[m.Merchant] || m.Merchant })), [omanMerchants, canonicalMap]);
 
-  const statsSource = tab.startsWith("oman_") ? omanUnifiedMerchants : unifiedMerchants;
+  const statsSource = (tab && tab.startsWith("oman_")) ? omanUnifiedMerchants : unifiedMerchants;
   const sidebarStats = useMemo(() => [
     ["Total", statsSource.length.toLocaleString()],
     ["Cities", new Set(statsSource.map(m => m.City)).size],

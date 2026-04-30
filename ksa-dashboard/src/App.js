@@ -2991,6 +2991,7 @@ function AdminSettingsTab({ anonKey, session }) {
 }
 
 /* ─── MAIN APP ───────────────────────────────────────────────── */
+export default function App() {
   const [anonKey, setAnonKey] = useState("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9tb3dkZnp5dWRlZHJ0Y3VobnZ5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NjQzNjI3OCwiZXhwIjoyMDkyMDEyMjc4fQ.kgQTvZRIrgFXTwL5wDM5oYLmDS9GtRjltE53wcpDQes");
   const [session, setSession] = useState(() => {
     try {

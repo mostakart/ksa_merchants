@@ -3002,7 +3002,7 @@ export default function App() {
   const [merchants, setMerchants] = useState([]);
   const [omanMerchants, setOmanMerchants] = useState([]);
   const [loadingCity, setLoadingCity] = useState("");
-  const [tab, setTab] = useState("macro");
+  const [tab, setTab] = useState(null);
   const [selectedMerchantForProfile, setSelectedMerchantForProfile] = useState(null);
   const [statuses, setStatuses] = useState({});
   const [statusSaving, setStatusSaving] = useState(false); // eslint-disable-line no-unused-vars
@@ -3062,10 +3062,10 @@ export default function App() {
   // 1. Role-Based Redirection: Ensure user is on a tab they have access to
   useEffect(() => {
     if (!userRole) return;
-    const currentTabAllowed = TABS.find(t => t.id === tab)?.roles.includes(userRole);
+    const currentTabAllowed = tab ? TABS.find(t => t.id === tab)?.roles.includes(userRole) : false;
     if (!currentTabAllowed) {
-      const firstAllowed = TABS.find(t => t.roles.includes(userRole));
-      if (firstAllowed) handleTabChange(firstAllowed.id);
+      const visibleTabs = TABS.filter(t => t.roles.includes(userRole));
+      if (visibleTabs.length > 0) handleTabChange(visibleTabs[0].id);
     }
   }, [userRole, tab]);
 
@@ -3332,13 +3332,18 @@ export default function App() {
         </nav>
 
         <div style={{ padding: "12px 16px", borderTop: `1px solid ${C.border}`, fontSize: 11, color: C.muted }}>
-          <div style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 }}>Merchants</div>
-          {sidebarStats.map(([l, v]) => (
-            <div key={l} style={{ display: "flex", justifyContent: "space-between", padding: "2px 0" }}>
-              <span>{l}</span><span style={{ color: C.text, fontWeight: 500 }}>{v}</span>
-            </div>
-          ))}
-          {ticketsLoaded && (
+          {['admin', 'ksa_bd', 'oman_bd', 'global_bd'].includes(userRole) && (
+            <>
+              <div style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 }}>Merchants</div>
+              {sidebarStats.map(([l, v]) => (
+                <div key={l} style={{ display: "flex", justifyContent: "space-between", padding: "2px 0" }}>
+                  <span>{l}</span><span style={{ color: C.text, fontWeight: 500 }}>{v}</span>
+                </div>
+              ))}
+            </>
+          )}
+
+          {['admin', 'crm_lead'].includes(userRole) && ticketsLoaded && (
             <>
               <div style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, marginTop: 8, marginBottom: 4 }}>Support</div>
               {[

@@ -2337,6 +2337,7 @@ function AgentProfile({ agentId, tickets, onBack, onTicketClick, onKPIFilter }) 
 /* ─── OFFER CREATION ─────────────────────────────────────────── */
 const N8N_IMPORT_URL = "https://mostafakhaleddd.app.n8n.cloud/webhook/test-offer";
 const N8N_EVAL_URL = "https://mostafakhaleddd.app.n8n.cloud/webhook/8c48a9a7-b371-4417-a4cf-baf156977fcc";
+const N8N_PHOTO_URL = "https://mostafakhaleddd.app.n8n.cloud/webhook/72211ff9-f091-4917-89e4-0f07bd6d53d7";
 
 function OfferCreationTab({ anonKey, session }) {
   const [ticketId, setTicketId] = useState("");
@@ -2350,12 +2351,52 @@ function OfferCreationTab({ anonKey, session }) {
   const [mainDesc, setMainDesc] = useState("");
   const [options, setOptions] = useState([]);
   const [conditions, setConditions] = useState([]);
+  const [photos, setPhotos] = useState([]); // New state for ticket attachments
   const [branchesText, setBranchesText] = useState("");
   const [aiScore, setAiScore] = useState(null);
   const [critique, setCritique] = useState("");
+  const [fetchingPhotos, setFetchingPhotos] = useState(false);
+  const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(null);
 
-  // Helper to detect Arabic text for layout flipping
   const isRTL = (text) => /[\u0600-\u06FF]/.test(text || "");
+  const closeLightbox = () => setSelectedPhotoIndex(null);
+
+  // Keyboard navigation for Lightbox
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (selectedPhotoIndex === null) return;
+      if (e.key === "ArrowLeft" && selectedPhotoIndex > 0) setSelectedPhotoIndex(prev => prev - 1);
+      if (e.key === "ArrowRight" && selectedPhotoIndex < photos.length - 1) setSelectedPhotoIndex(prev => prev + 1);
+      if (e.key === "Escape") closeLightbox();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [selectedPhotoIndex, photos.length]);
+
+  const handleFetchPhotos = async () => {
+    if (!ticketId.trim()) { setError("Please enter a Jira Ticket ID to fetch photos."); return; }
+    setFetchingPhotos(true); setError("");
+    try {
+      const res = await fetch(N8N_PHOTO_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ "ticket_id": ticketId.trim() }),
+      });
+      if (!res.ok) throw new Error(`Photo webhook error: ${res.status}`);
+      const raw = await res.text();
+      const data = parseN8nResponse(raw);
+      
+      // Smart extraction for Jira structures
+      let extracted = [];
+      if (Array.isArray(data.photos)) extracted = data.photos;
+      else if (Array.isArray(data) && data[0]?.data) extracted = data[0].data.map(item => item.content || item.thumbnail);
+      else if (data.data && Array.isArray(data.data)) extracted = data.data.map(item => item.content || item.thumbnail);
+      
+      setPhotos(extracted.filter(url => url));
+      setSuccess(`✓ Successfully fetched ${extracted.length} photos from Jira.`);
+    } catch (e) { setError("Photo fetch failed: " + e.message); }
+    setFetchingPhotos(false);
+  };
 
   const parseN8nResponse = (text) => {
     try { return JSON.parse(text); } catch { }
@@ -2427,7 +2468,8 @@ function OfferCreationTab({ anonKey, session }) {
       setConditions(Array.isArray(data.terms_list) 
         ? data.terms_list.map(t => ({ text: t, isDeleted: false })) 
         : (data.terms_list ? [{ text: data.terms_list, isDeleted: false }] : []));
-      setSuccess("✓ Offer imported successfully from Jira.");
+      setPhotos(Array.isArray(data.photos) ? data.photos : []);
+      setSuccess("✓ Offer and attachments imported successfully.");
     } catch (e) { setError("Import failed: " + e.message); }
     setImporting(false);
   };
@@ -2540,18 +2582,54 @@ function OfferCreationTab({ anonKey, session }) {
             </button>
           </Card>
 
-          {/* Photo gallery placeholder */}
+          {/* Photo gallery */}
           <Card>
-            <h3 style={{ fontSize: 14, fontWeight: 600, margin: "0 0 16px" }}>Merchant Photos</h3>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-              {[1, 2, 3, 4].map(i => (
-                <div key={i} style={{ aspectRatio: "4/3", borderRadius: 8, background: "#F9F8F7", border: `1px dashed ${C.border}`, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 4 }}>
-                  <span style={{ fontSize: 18, opacity: 0.2 }}>📷</span>
-                  <span style={{ fontSize: 9, color: C.muted }}>Photo {i}</span>
-                </div>
-              ))}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <h3 style={{ fontSize: 14, fontWeight: 600, margin: 0 }}>Merchant Photos</h3>
+              <button 
+                onClick={handleFetchPhotos} 
+                disabled={fetchingPhotos || !ticketId}
+                style={{ background: "none", border: `1px solid ${C.accent}`, color: C.accent, borderRadius: 6, padding: "4px 10px", fontSize: 11, fontWeight: 700, cursor: (fetchingPhotos || !ticketId) ? "not-allowed" : "pointer", opacity: (fetchingPhotos || !ticketId) ? 0.5 : 1, display: "flex", alignItems: "center", gap: 6 }}
+              >
+                {fetchingPhotos ? <Spinner dark /> : "Fetch Photos"}
+              </button>
             </div>
-            <p style={{ margin: "12px 0 0", fontSize: 11, color: C.muted, textAlign: "center" }}>Gallery integration coming soon</p>
+            
+            {photos.length > 0 ? (
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                {photos.map((url, i) => (
+                  <div 
+                    key={i} 
+                    onClick={() => setSelectedPhotoIndex(i)}
+                    style={{ 
+                      position: "relative", 
+                      aspectRatio: "4/3", 
+                      borderRadius: 8, 
+                      overflow: "hidden", 
+                      border: `1px solid ${C.border}`,
+                      cursor: "pointer",
+                      transition: "transform 0.2s, box-shadow 0.2s"
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.transform = "scale(1.02)";
+                      e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.1)";
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.transform = "scale(1)";
+                      e.currentTarget.style.boxShadow = "none";
+                    }}
+                  >
+                    <img src={url} alt={`Attachment ${i}`} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{ padding: "30px 0", textAlign: "center", background: "#F9F8F7", borderRadius: 8, border: `1px dashed ${C.border}` }}>
+                <span style={{ fontSize: 24, opacity: 0.2 }}>📷</span>
+                <p style={{ margin: "8px 0 0", fontSize: 11, color: C.muted }}>No attachments found in ticket</p>
+              </div>
+            )}
+            {photos.length > 0 && <p style={{ margin: "12px 0 0", fontSize: 11, color: C.muted, textAlign: "center" }}>{photos.length} photos imported from Jira</p>}
           </Card>
 
           {/* Critique card (visible after evaluate) */}
@@ -2696,6 +2774,79 @@ function OfferCreationTab({ anonKey, session }) {
         </Card>
 
       </div>
+
+      {/* Photo Lightbox */}
+      {selectedPhotoIndex !== null && (
+        <div 
+          style={{
+            position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+            background: "rgba(0,0,0,0.9)", zIndex: 10000,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            backdropFilter: "blur(5px)"
+          }}
+          onClick={() => setSelectedPhotoIndex(null)}
+        >
+          <button 
+            style={{ position: "absolute", top: 20, right: 20, background: "none", border: "none", color: "#fff", fontSize: 32, cursor: "pointer", zIndex: 10001 }}
+            onClick={(e) => { e.stopPropagation(); setSelectedPhotoIndex(null); }}
+          >
+            ×
+          </button>
+
+          {/* Navigation Buttons */}
+          <button 
+            disabled={selectedPhotoIndex === 0}
+            style={{ 
+              position: "absolute", left: 20, background: "rgba(255,255,255,0.15)", border: "none", 
+              color: "#fff", width: 52, height: 52, borderRadius: "50%", fontSize: 28, 
+              cursor: selectedPhotoIndex === 0 ? "not-allowed" : "pointer", opacity: selectedPhotoIndex === 0 ? 0.3 : 1,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              transition: "background 0.2s",
+              paddingRight: 4 // Optical centering for ‹ character
+            }}
+            onMouseEnter={e => { if (selectedPhotoIndex > 0) e.currentTarget.style.background = "rgba(255,255,255,0.25)"; }}
+            onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.15)"; }}
+            onClick={(e) => { 
+              e.stopPropagation(); 
+              if (selectedPhotoIndex > 0) setSelectedPhotoIndex(selectedPhotoIndex - 1); 
+            }}
+          >
+            ‹
+          </button>
+
+          <img 
+            src={photos[selectedPhotoIndex]} 
+            alt="Full size view" 
+            style={{ maxHeight: "85vh", maxWidth: "80vw", objectFit: "contain", borderRadius: 8, boxShadow: "0 20px 60px rgba(0,0,0,0.8)" }}
+            onClick={(e) => e.stopPropagation()}
+          />
+
+          <button 
+            disabled={selectedPhotoIndex === photos.length - 1}
+            style={{ 
+              position: "absolute", right: 20, background: "rgba(255,255,255,0.15)", border: "none", 
+              color: "#fff", width: 52, height: 52, borderRadius: "50%", fontSize: 28, 
+              cursor: selectedPhotoIndex === photos.length - 1 ? "not-allowed" : "pointer", opacity: selectedPhotoIndex === photos.length - 1 ? 0.3 : 1,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              transition: "background 0.2s",
+              paddingLeft: 4 // Optical centering for › character
+            }}
+            onMouseEnter={e => { if (selectedPhotoIndex < photos.length - 1) e.currentTarget.style.background = "rgba(255,255,255,0.25)"; }}
+            onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.15)"; }}
+            onClick={(e) => { 
+              e.stopPropagation(); 
+              if (selectedPhotoIndex < photos.length - 1) setSelectedPhotoIndex(selectedPhotoIndex + 1); 
+            }}
+          >
+            ›
+          </button>
+
+          {/* Counter */}
+          <div style={{ position: "absolute", bottom: 20, color: "rgba(255,255,255,0.6)", fontSize: 13, fontWeight: 500 }}>
+            {selectedPhotoIndex + 1} / {photos.length}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

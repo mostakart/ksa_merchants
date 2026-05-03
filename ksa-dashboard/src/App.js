@@ -2,6 +2,9 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { pipeline, env } from "@xenova/transformers";
 import MerchantProfiler from "./MerchantProfiler";
 import MerchantNotes from "./MerchantNotes";
+import EgyptTopMerchantsTab from "./EgyptTopMerchantsTab";
+import { CIOverviewTab, CIWarRoomTab, CIPipelineTab } from "./CompetitiveIntelTab";
+import { SystemMonitorTab } from "./SystemMonitorTab";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, CartesianGrid,
@@ -237,7 +240,12 @@ const TABS = [
   { id: "tickets", label: "Ticket Explorer", group: "CRM & Support", roles: ["admin", "crm_lead"], d: "M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8zM14 2v6h6M16 13H8M16 17H8M10 9H8" },
   { id: "chat", label: "Chat Review", group: "CRM & Support", roles: ["admin", "crm_lead"], d: "M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" },
   { id: "admin", label: "Admin Settings", group: "Settings", roles: ["admin"], d: "M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065zM15 12a3 3 0 11-6 0 3 3 0 016 0z" },
+  { id: "system_monitor", label: "System Monitor", group: "Settings", roles: ["admin"], d: "M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" },
   { id: "offer_creation", label: "Offer Creation", group: "Content & Offers", roles: ["admin", "content_editor"], d: "M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" },
+  { id: "egypt_merchants", label: "Egypt Top Merchants", group: "Egypt Intelligence", roles: ["admin", "global_bd", "viewer"], d: "M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" },
+  { id: "ci_overview",  label: "Command Center",    group: "Competitive Intel", roles: ["admin", "global_bd"],              d: "M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" },
+  { id: "ci_war_room",  label: "Competitor Detail",  group: "Competitive Intel", roles: ["admin", "global_bd"],              d: "M15 12a3 3 0 11-6 0 3 3 0 016 0zm-3-9a9 9 0 100 18A9 9 0 0012 3z" },
+  { id: "ci_pipeline",  label: "Pipeline Control",   group: "Competitive Intel", roles: ["admin"],                           d: "M4 6h16M4 10h16M4 14h16M4 18h16" },
 ];
 
 /* ─── SETUP SCREEN ───────────────────────────────────────────── */
@@ -2376,6 +2384,10 @@ function OfferCreationTab({ anonKey, session }) {
   const [critique, setCritique] = useState("");
   const [fetchingPhotos, setFetchingPhotos] = useState(false);
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(null);
+  const [activeTab, setActiveTab] = useState("create"); // "create" or "library"
+  const [drafts, setDrafts] = useState([]);
+  const [loadingDrafts, setLoadingDrafts] = useState(false);
+  const [selectedDraft, setSelectedDraft] = useState(null);
 
   const isRTL = (text) => /[\u0600-\u06FF]/.test(text || "");
   const closeLightbox = () => setSelectedPhotoIndex(null);
@@ -2404,13 +2416,13 @@ function OfferCreationTab({ anonKey, session }) {
       if (!res.ok) throw new Error(`Photo webhook error: ${res.status}`);
       const raw = await res.text();
       const data = parseN8nResponse(raw);
-      
+
       // Smart extraction for Jira structures
       let extracted = [];
       if (Array.isArray(data.photos)) extracted = data.photos;
       else if (Array.isArray(data) && data[0]?.data) extracted = data[0].data.map(item => item.content || item.thumbnail);
       else if (data.data && Array.isArray(data.data)) extracted = data.data.map(item => item.content || item.thumbnail);
-      
+
       setPhotos(extracted.filter(url => url));
       setSuccess(`✓ Successfully fetched ${extracted.length} photos from Jira.`);
     } catch (e) { setError("Photo fetch failed: " + e.message); }
@@ -2471,7 +2483,7 @@ function OfferCreationTab({ anonKey, session }) {
       setOfferTitle(data.main_deal_title || "");
       setMainDesc(data.main_description || "");
       setBranchesText(data.branches_text || "");
-      
+
       if (Array.isArray(data.buy_options)) {
         setOptions(data.buy_options.map(o => ({
           title: o.option_title || "",
@@ -2484,8 +2496,8 @@ function OfferCreationTab({ anonKey, session }) {
       } else {
         setOptions([]);
       }
-      setConditions(Array.isArray(data.terms_list) 
-        ? data.terms_list.map(t => ({ text: t, isDeleted: false })) 
+      setConditions(Array.isArray(data.terms_list)
+        ? data.terms_list.map(t => ({ text: t, isDeleted: false }))
         : (data.terms_list ? [{ text: data.terms_list, isDeleted: false }] : []));
       setPhotos(Array.isArray(data.photos) ? data.photos : []);
       setSuccess("✓ Offer and attachments imported successfully.");
@@ -2522,13 +2534,38 @@ function OfferCreationTab({ anonKey, session }) {
       const res = await fetch(`${SB_URL}/rest/v1/offer_drafts`, {
         method: "POST",
         headers: { ...sbH(anonKey, session.access_token), "Prefer": "return=minimal" },
-        body: JSON.stringify({ ticket_id: ticketId.trim(), merchant_name: merchantName, title: offerTitle, options: JSON.stringify(activeOptions), conditions: JSON.stringify(activeConditions), created_by: session.user.email }),
+        body: JSON.stringify({ 
+          ticket_id: ticketId.trim(), 
+          merchant_name: merchantName, 
+          title: offerTitle, 
+          options: JSON.stringify(activeOptions), 
+          conditions: JSON.stringify(activeConditions), 
+          created_by: session.user.email,
+          photos: JSON.stringify(photos) // Save photo URLs
+        }),
       });
       if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.message || `Supabase error: ${res.status}`); }
       setSuccess("✓ Offer draft saved to database successfully.");
+      if (activeTab === "library") fetchDrafts();
     } catch (e) { setError("Save failed: " + e.message); }
     setSaving(false);
   };
+
+  const fetchDrafts = async () => {
+    setLoadingDrafts(true);
+    try {
+      const res = await fetch(`${SB_URL}/rest/v1/offer_drafts?select=*&order=created_at.desc`, {
+        headers: sbH(anonKey, session.access_token)
+      });
+      if (!res.ok) throw new Error("Failed to fetch drafts");
+      setDrafts(await res.json());
+    } catch (e) { setError("Library fetch failed: " + e.message); }
+    setLoadingDrafts(false);
+  };
+
+  useEffect(() => {
+    if (activeTab === "library") fetchDrafts();
+  }, [activeTab]);
 
   const scoreColor = aiScore === null ? C.muted : aiScore >= 80 ? "#22c55e" : aiScore >= 60 ? "#f59e0b" : "#ef4444";
 
@@ -2558,14 +2595,26 @@ function OfferCreationTab({ anonKey, session }) {
       `}</style>
 
       {/* Header */}
-      <div style={{ marginBottom: 24 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <h2 style={{ fontSize: 24, fontWeight: 700, margin: "0 0 4px", letterSpacing: "-.5px" }}>Offer Creation</h2>
-          {aiScore !== null && (
-            <div style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 38, height: 38, borderRadius: "50%", background: scoreColor, color: "#fff", fontSize: 13, fontWeight: 800, boxShadow: `0 2px 8px ${scoreColor}44` }}>{aiScore}</div>
-          )}
+      <div style={{ marginBottom: 24, display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+        <div>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <h2 style={{ fontSize: 24, fontWeight: 700, margin: "0 0 4px", letterSpacing: "-.5px" }}>Offer Creation</h2>
+            {activeTab === "create" && aiScore !== null && (
+              <div style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 38, height: 38, borderRadius: "50%", background: scoreColor, color: "#fff", fontSize: 13, fontWeight: 800, boxShadow: `0 2px 8px ${scoreColor}44` }}>{aiScore}</div>
+            )}
+          </div>
+          <p style={{ margin: 0, color: C.muted, fontSize: 13 }}>AI-powered offer drafting from Jira tickets · Waffarha Content Studio</p>
         </div>
-        <p style={{ margin: 0, color: C.muted, fontSize: 13 }}>AI-powered offer drafting from Jira tickets · Waffarha Content Studio</p>
+
+        {/* Inner Tabs */}
+        <div style={{ display: "flex", background: "#E8E4DF", padding: 4, borderRadius: 10, gap: 4 }}>
+          <button onClick={() => setActiveTab("create")} style={{ padding: "8px 16px", borderRadius: 8, border: "none", fontSize: 13, fontWeight: 600, cursor: "pointer", background: activeTab === "create" ? "#fff" : "transparent", color: activeTab === "create" ? C.text : C.sub, boxShadow: activeTab === "create" ? "0 2px 4px rgba(0,0,0,0.05)" : "none", transition: "all 0.2s" }}>
+            Create New
+          </button>
+          <button onClick={() => setActiveTab("library")} style={{ padding: "8px 16px", borderRadius: 8, border: "none", fontSize: 13, fontWeight: 600, cursor: "pointer", background: activeTab === "library" ? "#fff" : "transparent", color: activeTab === "library" ? C.text : C.sub, boxShadow: activeTab === "library" ? "0 2px 4px rgba(0,0,0,0.05)" : "none", transition: "all 0.2s" }}>
+            Drafts Library
+          </button>
+        </div>
       </div>
 
       {/* Toast messages */}
@@ -2583,220 +2632,368 @@ function OfferCreationTab({ anonKey, session }) {
       )}
 
       {/* 2-column layout */}
-      <div style={{ display: "grid", gridTemplateColumns: "320px 1fr", gap: 20, alignItems: "start" }}>
+      {activeTab === "create" ? (
+        <div style={{ display: "grid", gridTemplateColumns: "320px 1fr", gap: 20, alignItems: "start" }}>
 
-        {/* LEFT column */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+          {/* LEFT column */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
 
-          {/* Import card */}
-          <Card>
-            <h3 style={{ fontSize: 14, fontWeight: 600, margin: "0 0 16px" }}>Import from Jira</h3>
-            <label style={lbl}>Ticket ID</label>
-            <input dir="auto" value={ticketId} onChange={e => setTicketId(e.target.value)} onKeyDown={e => e.key === "Enter" && handleImport()} placeholder="e.g. GPT-6673" style={inp} />
-            <button
-              onClick={handleImport} disabled={importing}
-              style={{ marginTop: 14, width: "100%", padding: "10px 0", background: C.accent, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: importing ? "not-allowed" : "pointer", opacity: importing ? 0.7 : 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
-            >
-              {importing ? <><Spinner />Importing…</> : "Import Offer Data"}
-            </button>
-          </Card>
-
-          {/* Photo gallery */}
-          <Card>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-              <h3 style={{ fontSize: 14, fontWeight: 600, margin: 0 }}>Merchant Photos</h3>
-              <button 
-                onClick={handleFetchPhotos} 
-                disabled={fetchingPhotos || !ticketId}
-                style={{ background: "none", border: `1px solid ${C.accent}`, color: C.accent, borderRadius: 6, padding: "4px 10px", fontSize: 11, fontWeight: 700, cursor: (fetchingPhotos || !ticketId) ? "not-allowed" : "pointer", opacity: (fetchingPhotos || !ticketId) ? 0.5 : 1, display: "flex", alignItems: "center", gap: 6 }}
+            {/* Import card */}
+            <Card>
+              <h3 style={{ fontSize: 14, fontWeight: 600, margin: "0 0 16px" }}>Import from Jira</h3>
+              <label style={lbl}>Ticket ID</label>
+              <input dir="auto" value={ticketId} onChange={e => setTicketId(e.target.value)} onKeyDown={e => e.key === "Enter" && handleImport()} placeholder="e.g. GPT-6673" style={inp} />
+              <button
+                onClick={handleImport} disabled={importing}
+                style={{ marginTop: 14, width: "100%", padding: "10px 0", background: C.accent, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: importing ? "not-allowed" : "pointer", opacity: importing ? 0.7 : 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
               >
-                {fetchingPhotos ? <Spinner dark /> : "Fetch Photos"}
+                {importing ? <><Spinner />Importing…</> : "Import Offer Data"}
               </button>
-            </div>
-            
-            {photos.length > 0 ? (
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                {photos.map((url, i) => (
-                  <div 
-                    key={i} 
-                    onClick={() => setSelectedPhotoIndex(i)}
-                    style={{ 
-                      position: "relative", 
-                      aspectRatio: "4/3", 
-                      borderRadius: 8, 
-                      overflow: "hidden", 
-                      border: `1px solid ${C.border}`,
-                      cursor: "pointer",
-                      transition: "transform 0.2s, box-shadow 0.2s"
-                    }}
-                    onMouseEnter={e => {
-                      e.currentTarget.style.transform = "scale(1.02)";
-                      e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.1)";
-                    }}
-                    onMouseLeave={e => {
-                      e.currentTarget.style.transform = "scale(1)";
-                      e.currentTarget.style.boxShadow = "none";
-                    }}
-                  >
-                    <img src={url} alt={`Attachment ${i}`} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div style={{ padding: "30px 0", textAlign: "center", background: "#F9F8F7", borderRadius: 8, border: `1px dashed ${C.border}` }}>
-                <span style={{ fontSize: 24, opacity: 0.2 }}>📷</span>
-                <p style={{ margin: "8px 0 0", fontSize: 11, color: C.muted }}>No attachments found in ticket</p>
-              </div>
-            )}
-            {photos.length > 0 && <p style={{ margin: "12px 0 0", fontSize: 11, color: C.muted, textAlign: "center" }}>{photos.length} photos imported from Jira</p>}
-          </Card>
-
-          {/* Critique card (visible after evaluate) */}
-          {critique && (
-            <Card style={{ background: "#FEFCE8", borderColor: "#FEF08A" }}>
-              <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 10, color: "#854D0E" }}>AI Critique</h3>
-              <p dir="auto" style={{ margin: 0, fontSize: 12, color: "#713F12", lineHeight: 1.6, whiteSpace: "pre-line", textAlign: "start" }}>{critique}</p>
             </Card>
-          )}
 
-        </div>
-
-        {/* RIGHT column — Offer form */}
-        <Card>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-            <h3 style={{ fontSize: 14, fontWeight: 600, margin: 0 }}>Offer Draft</h3>
-            {aiScore !== null && (
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ fontSize: 11, color: C.muted }}>Quality Score:</span>
-                <span style={{ fontWeight: 700, color: scoreColor }}>{aiScore}%</span>
+            {/* Photo gallery */}
+            <Card>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                <h3 style={{ fontSize: 14, fontWeight: 600, margin: 0 }}>Merchant Photos</h3>
+                <button
+                  onClick={handleFetchPhotos}
+                  disabled={fetchingPhotos || !ticketId}
+                  style={{ background: "none", border: `1px solid ${C.accent}`, color: C.accent, borderRadius: 6, padding: "4px 10px", fontSize: 11, fontWeight: 700, cursor: (fetchingPhotos || !ticketId) ? "not-allowed" : "pointer", opacity: (fetchingPhotos || !ticketId) ? 0.5 : 1, display: "flex", alignItems: "center", gap: 6 }}
+                >
+                  {fetchingPhotos ? <Spinner dark /> : "Fetch Photos"}
+                </button>
               </div>
+
+              {photos.length > 0 ? (
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                  {photos.map((url, i) => (
+                    <div
+                      key={i}
+                      onClick={() => setSelectedPhotoIndex(i)}
+                      style={{
+                        position: "relative",
+                        aspectRatio: "4/3",
+                        borderRadius: 8,
+                        overflow: "hidden",
+                        border: `1px solid ${C.border}`,
+                        cursor: "pointer",
+                        transition: "transform 0.2s, box-shadow 0.2s"
+                      }}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.transform = "scale(1.02)";
+                        e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.1)";
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.transform = "scale(1)";
+                        e.currentTarget.style.boxShadow = "none";
+                      }}
+                    >
+                      <img src={url} alt={`Attachment ${i}`} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ padding: "30px 0", textAlign: "center", background: "#F9F8F7", borderRadius: 8, border: `1px dashed ${C.border}` }}>
+                  <span style={{ fontSize: 24, opacity: 0.2 }}>📷</span>
+                  <p style={{ margin: "8px 0 0", fontSize: 11, color: C.muted }}>No attachments found in ticket</p>
+                </div>
+              )}
+              {photos.length > 0 && <p style={{ margin: "12px 0 0", fontSize: 11, color: C.muted, textAlign: "center" }}>{photos.length} photos imported from Jira</p>}
+            </Card>
+
+            {/* Critique card (visible after evaluate) */}
+            {critique && (
+              <Card style={{ background: "#FEFCE8", borderColor: "#FEF08A" }}>
+                <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 10, color: "#854D0E" }}>AI Critique</h3>
+                <p dir="auto" style={{ margin: 0, fontSize: 12, color: "#713F12", lineHeight: 1.6, whiteSpace: "pre-line", textAlign: "start" }}>{critique}</p>
+              </Card>
             )}
+
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            <div>
-              <label style={lbl}>Merchant Name</label>
-              <input dir="auto" value={merchantName} onChange={e => setMerchantName(e.target.value)} placeholder="Merchant name..." style={inp} />
-            </div>
-            <div>
-              <label style={lbl}>Offer Title</label>
-              <input dir="auto" value={offerTitle} onChange={e => setOfferTitle(e.target.value)} placeholder="Main deal title..." style={inp} />
-            </div>
-            <div>
-              <label style={lbl}>Description</label>
-              <textarea dir="auto" value={mainDesc} onChange={e => setMainDesc(e.target.value)} placeholder="Main offer description..." rows={3} style={{ ...inp, resize: "vertical", lineHeight: 1.6 }} />
+          {/* RIGHT column — Offer form */}
+          <Card>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+              <h3 style={{ fontSize: 14, fontWeight: 600, margin: 0 }}>Offer Draft</h3>
+              {aiScore !== null && (
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 11, color: C.muted }}>Quality Score:</span>
+                  <span style={{ fontWeight: 700, color: scoreColor }}>{aiScore}%</span>
+                </div>
+              )}
             </div>
 
-            {/* OPTIONS SECTION */}
-            <div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                <label style={lbl}>Options & Packages</label>
-                <button onClick={addOption} style={{ background: "none", border: `1px solid ${C.accent}`, color: C.accent, borderRadius: 6, padding: "2px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>+ Add Option</button>
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <div>
+                <label style={lbl}>Merchant Name</label>
+                <input dir="auto" value={merchantName} onChange={e => setMerchantName(e.target.value)} placeholder="Merchant name..." style={inp} />
               </div>
-              
-              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                {options.map((opt, idx) => {
-                  const ar = isRTL(opt.title) || isRTL(opt.content);
-                  return (
-                    <div key={idx} style={{ 
-                      position: "relative", 
-                      padding: ar ? "16px 48px 16px 16px" : "16px 16px 16px 48px", 
-                      border: `1px dashed ${opt.isDeleted ? "#e5e7eb" : C.border}`, 
-                      borderRadius: 12, 
-                      background: opt.isDeleted ? "#f9fafb" : "#fff", 
-                      overflow: "hidden",
-                      opacity: opt.isDeleted ? 0.6 : 1,
-                      filter: opt.isDeleted ? "grayscale(1)" : "none",
-                      transition: "all 0.2s"
-                    }}>
-                      <div className="ticket-edge" style={{ left: ar ? "auto" : 0, right: ar ? 0 : "auto", transform: ar ? "scaleX(-1)" : "none" }} />
-                      <button 
-                        onClick={() => toggleDeleteOption(idx)} 
-                        style={{ position: "absolute", top: 8, right: ar ? "auto" : 8, left: ar ? 8 : "auto", background: opt.isDeleted ? "#f3f4f6" : "none", border: "none", color: opt.isDeleted ? C.accent : "#ef4444", cursor: "pointer", fontSize: opt.isDeleted ? 10 : 16, fontWeight: 700, borderRadius: 4, padding: opt.isDeleted ? "2px 6px" : 0 }}
-                      >
-                        {opt.isDeleted ? "UNDO" : "×"}
-                      </button>
-                      
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 140px", gap: 16, direction: ar ? "rtl" : "ltr", textAlign: "start" }}>
-                        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                          <input dir="auto" value={opt.title} onChange={e => updateOption(idx, "title", e.target.value)} placeholder="Option Title" style={{ ...inp, fontWeight: 700, border: "none", padding: 0, fontSize: 15, background: "transparent" }} />
-                          <textarea dir="auto" value={opt.content} onChange={e => updateOption(idx, "content", e.target.value)} placeholder="Details..." rows={2} style={{ ...inp, border: "none", padding: 0, color: C.muted, fontSize: 12, resize: "none", background: "transparent" }} />
-                        </div>
-                        <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: ar ? "flex-start" : "flex-end", justifyContent: "center" }}>
-                          <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
-                            <span style={{ fontSize: 18, fontWeight: 800, color: C.accent }}>{opt.price}</span>
-                            <span style={{ fontSize: 12, fontWeight: 700, color: C.accent, marginLeft: ar ? 8 : 0, marginRight: ar ? 0 : 8 }}>EGP</span>
-                            <span style={{ fontSize: 12, color: C.muted, textDecoration: "line-through" }}>{opt.originalPrice}</span>
+              <div>
+                <label style={lbl}>Offer Title</label>
+                <input dir="auto" value={offerTitle} onChange={e => setOfferTitle(e.target.value)} placeholder="Main deal title..." style={inp} />
+              </div>
+              <div>
+                <label style={lbl}>Description</label>
+                <textarea dir="auto" value={mainDesc} onChange={e => setMainDesc(e.target.value)} placeholder="Main offer description..." rows={3} style={{ ...inp, resize: "vertical", lineHeight: 1.6 }} />
+              </div>
+
+              {/* OPTIONS SECTION */}
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                  <label style={lbl}>Options & Packages</label>
+                  <button onClick={addOption} style={{ background: "none", border: `1px solid ${C.accent}`, color: C.accent, borderRadius: 6, padding: "2px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>+ Add Option</button>
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  {options.map((opt, idx) => {
+                    const ar = isRTL(opt.title) || isRTL(opt.content);
+                    return (
+                      <div key={idx} style={{
+                        position: "relative",
+                        padding: ar ? "16px 48px 16px 16px" : "16px 16px 16px 48px",
+                        border: `1px dashed ${opt.isDeleted ? "#e5e7eb" : C.border}`,
+                        borderRadius: 12,
+                        background: opt.isDeleted ? "#f9fafb" : "#fff",
+                        overflow: "hidden",
+                        opacity: opt.isDeleted ? 0.6 : 1,
+                        filter: opt.isDeleted ? "grayscale(1)" : "none",
+                        transition: "all 0.2s"
+                      }}>
+                        <div className="ticket-edge" style={{ left: ar ? "auto" : 0, right: ar ? 0 : "auto", transform: ar ? "scaleX(-1)" : "none" }} />
+                        <button
+                          onClick={() => toggleDeleteOption(idx)}
+                          style={{ position: "absolute", top: 8, right: ar ? "auto" : 8, left: ar ? 8 : "auto", background: opt.isDeleted ? "#f3f4f6" : "none", border: "none", color: opt.isDeleted ? C.accent : "#ef4444", cursor: "pointer", fontSize: opt.isDeleted ? 10 : 16, fontWeight: 700, borderRadius: 4, padding: opt.isDeleted ? "2px 6px" : 0 }}
+                        >
+                          {opt.isDeleted ? "UNDO" : "×"}
+                        </button>
+
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 140px", gap: 16, direction: ar ? "rtl" : "ltr", textAlign: "start" }}>
+                          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                            <input dir="auto" value={opt.title} onChange={e => updateOption(idx, "title", e.target.value)} placeholder="Option Title" style={{ ...inp, fontWeight: 700, border: "none", padding: 0, fontSize: 15, background: "transparent" }} />
+                            <textarea dir="auto" value={opt.content} onChange={e => updateOption(idx, "content", e.target.value)} placeholder="Details..." rows={2} style={{ ...inp, border: "none", padding: 0, color: C.muted, fontSize: 12, resize: "none", background: "transparent" }} />
                           </div>
-                          <div style={{ display: "flex", gap: 8 }}>
-                             <input value={opt.price} onChange={e => updateOption(idx, "price", e.target.value)} placeholder="Now" style={{ ...inp, width: 60, padding: "4px 8px", fontSize: 11 }} />
-                             <input value={opt.originalPrice} onChange={e => updateOption(idx, "originalPrice", e.target.value)} placeholder="Was" style={{ ...inp, width: 60, padding: "4px 8px", fontSize: 11 }} />
+                          <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: ar ? "flex-start" : "flex-end", justifyContent: "center" }}>
+                            <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
+                              <span style={{ fontSize: 18, fontWeight: 800, color: C.accent }}>{opt.price}</span>
+                              <span style={{ fontSize: 12, fontWeight: 700, color: C.accent, marginLeft: ar ? 8 : 0, marginRight: ar ? 0 : 8 }}>EGP</span>
+                              <span style={{ fontSize: 12, color: C.muted, textDecoration: "line-through" }}>{opt.originalPrice}</span>
+                            </div>
+                            <div style={{ display: "flex", gap: 8 }}>
+                              <input value={opt.price} onChange={e => updateOption(idx, "price", e.target.value)} placeholder="Now" style={{ ...inp, width: 60, padding: "4px 8px", fontSize: 11 }} />
+                              <input value={opt.originalPrice} onChange={e => updateOption(idx, "originalPrice", e.target.value)} placeholder="Was" style={{ ...inp, width: 60, padding: "4px 8px", fontSize: 11 }} />
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* TERMS SECTION */}
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                  <label style={lbl}>Terms & Conditions</label>
+                  <button onClick={addCondition} style={{ background: "none", border: `1px solid ${C.accent}`, color: C.accent, borderRadius: 6, padding: "2px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>+ Add Term</button>
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {conditions.map((term, idx) => {
+                    const ar = isRTL(term.text);
+                    return (
+                      <div key={idx} style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 12,
+                        flexDirection: ar ? "row-reverse" : "row",
+                        opacity: term.isDeleted ? 0.5 : 1,
+                        filter: term.isDeleted ? "grayscale(1)" : "none",
+                        transition: "all 0.2s"
+                      }}>
+                        <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#D1D5DB", flexShrink: 0 }} />
+                        <input dir="auto" value={term.text} onChange={e => updateCondition(idx, e.target.value)} placeholder="Condition..." style={{ ...inp, border: "none", padding: "4px 0", fontSize: 13, background: "transparent", textAlign: "start" }} />
+                        <button
+                          onClick={() => toggleDeleteCondition(idx)}
+                          style={{ background: term.isDeleted ? "#f3f4f6" : "none", border: "none", color: term.isDeleted ? C.accent : "#ef4444", cursor: "pointer", fontSize: term.isDeleted ? 10 : 16, fontWeight: 700, padding: "2px 8px", borderRadius: 4 }}
+                        >
+                          {term.isDeleted ? "UNDO" : "×"}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </div>
 
-            {/* TERMS SECTION */}
-            <div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                <label style={lbl}>Terms & Conditions</label>
-                <button onClick={addCondition} style={{ background: "none", border: `1px solid ${C.accent}`, color: C.accent, borderRadius: 6, padding: "2px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>+ Add Term</button>
+            {/* Action buttons */}
+            <div style={{ display: "flex", gap: 12, marginTop: 24, justifyContent: "flex-end" }}>
+              <button
+                onClick={handleEvaluate} disabled={evaluating || !offerTitle}
+                style={{ padding: "10px 20px", background: "#fff", color: C.text, border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: (evaluating || !offerTitle) ? "not-allowed" : "pointer", opacity: (evaluating || !offerTitle) ? 0.5 : 1, display: "inline-flex", alignItems: "center", gap: 8 }}
+              >
+                {evaluating ? <><Spinner dark />Evaluating…</> : "Evaluate with AI"}
+              </button>
+              <button
+                onClick={handleSave} disabled={saving || !merchantName || !offerTitle}
+                style={{ padding: "10px 24px", background: "#1A1A1A", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: (saving || !merchantName || !offerTitle) ? "not-allowed" : "pointer", opacity: (saving || !merchantName || !offerTitle) ? 0.5 : 1, display: "inline-flex", alignItems: "center", gap: 8 }}
+              >
+                {saving ? <><Spinner />Saving…</> : "Save Draft"}
+              </button>
+            </div>
+          </Card>
+
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+          {/* DRAFTS LIBRARY */}
+          <Card style={{ padding: 0, overflow: "hidden" }}>
+            <div style={{ padding: "16px 20px", borderBottom: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <h3 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>All Drafted Offers</h3>
+              <button 
+                onClick={fetchDrafts} 
+                title="Refresh Library"
+                style={{ 
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                  background: "none", border: `1px solid ${C.border}`, borderRadius: 8,
+                  padding: "6px 12px", color: C.sub, fontSize: 11, fontWeight: 600, cursor: "pointer", transition: "all 0.2s" 
+                }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.sub; }}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0114.85-3.36L23 10M1.49 14l4.64 4.36A9 9 0 0020.49 15" />
+                </svg>
+                Refresh Library
+              </button>
+            </div>
+
+            {loadingDrafts ? (
+              <div style={{ padding: 60, textAlign: "center", color: C.muted, fontSize: 13 }}>
+                <Spinner dark /><br /><br />Fetching drafts...
               </div>
-              
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {conditions.map((term, idx) => {
-                  const ar = isRTL(term.text);
-                  return (
-                    <div key={idx} style={{ 
-                      display: "flex", 
-                      alignItems: "center", 
-                      gap: 12, 
-                      flexDirection: ar ? "row-reverse" : "row",
-                      opacity: term.isDeleted ? 0.5 : 1,
-                      filter: term.isDeleted ? "grayscale(1)" : "none",
-                      transition: "all 0.2s"
-                    }}>
-                      <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#D1D5DB", flexShrink: 0 }} />
-                      <input dir="auto" value={term.text} onChange={e => updateCondition(idx, e.target.value)} placeholder="Condition..." style={{ ...inp, border: "none", padding: "4px 0", fontSize: 13, background: "transparent", textAlign: "start" }} />
-                      <button 
-                        onClick={() => toggleDeleteCondition(idx)} 
-                        style={{ background: term.isDeleted ? "#f3f4f6" : "none", border: "none", color: term.isDeleted ? C.accent : "#ef4444", cursor: "pointer", fontSize: term.isDeleted ? 10 : 16, fontWeight: 700, padding: "2px 8px", borderRadius: 4 }}
-                      >
-                        {term.isDeleted ? "UNDO" : "×"}
-                      </button>
+            ) : drafts.length === 0 ? (
+              <div style={{ padding: 60, textAlign: "center", color: C.muted }}>
+                <span style={{ fontSize: 32, opacity: 0.2 }}>📄</span>
+                <p style={{ margin: "12px 0 0", fontSize: 13 }}>No offer drafts found in the database.</p>
+              </div>
+            ) : (
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                <thead>
+                  <tr style={{ background: "#F9F8F7", borderBottom: `1px solid ${C.border}` }}>
+                    <th style={{ padding: "12px 20px", textAlign: "left", color: C.sub, fontWeight: 500, fontSize: 11, textTransform: "uppercase" }}>Merchant</th>
+                    <th style={{ padding: "12px 20px", textAlign: "left", color: C.sub, fontWeight: 500, fontSize: 11, textTransform: "uppercase" }}>Offer Title</th>
+                    <th style={{ padding: "12px 20px", textAlign: "left", color: C.sub, fontWeight: 500, fontSize: 11, textTransform: "uppercase" }}>Creator</th>
+                    <th style={{ padding: "12px 20px", textAlign: "left", color: C.sub, fontWeight: 500, fontSize: 11, textTransform: "uppercase" }}>Saved Date</th>
+                    <th style={{ padding: "12px 20px", textAlign: "right" }}></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {drafts.map((d) => (
+                    <tr key={d.id} style={{ borderBottom: `1px solid ${C.border}`, transition: "background 0.2s" }} onMouseEnter={e => e.currentTarget.style.background = "#fcfcfc"} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                      <td style={{ padding: "14px 20px", fontWeight: 700 }}>{d.merchant_name}</td>
+                      <td style={{ padding: "14px 20px", color: C.text }}>{d.title}</td>
+                      <td style={{ padding: "14px 20px" }}>
+                        <span style={{ padding: "4px 8px", background: "#f1f5f9", color: "#475569", borderRadius: 6, fontSize: 11, fontWeight: 600 }}>{d.created_by}</span>
+                      </td>
+                      <td style={{ padding: "14px 20px", color: C.muted }}>{new Date(d.created_at).toLocaleDateString()}</td>
+                      <td style={{ padding: "14px 20px", textAlign: "right" }}>
+                        <button 
+                          onClick={() => setSelectedDraft(d)}
+                          style={{ padding: "6px 12px", background: "#fff", border: `1px solid ${C.border}`, borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer", transition: "all 0.2s" }}
+                          onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
+                          onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.text; }}
+                        >
+                          Preview
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </Card>
+        </div>
+      )}
+
+      {/* Draft Preview Modal */}
+      {selectedDraft && (
+        <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.6)", zIndex: 10002, display: "flex", alignItems: "center", justifyContent: "center", padding: 40 }} onClick={() => setSelectedDraft(null)}>
+          <Card style={{ maxWidth: 800, width: "100%", maxHeight: "100%", overflowY: "auto", position: "relative", padding: 32 }} onClick={e => e.stopPropagation()}>
+            <button onClick={() => setSelectedDraft(null)} style={{ position: "absolute", top: 20, right: 20, background: "none", border: "none", cursor: "pointer", fontSize: 24, color: C.muted }}>×</button>
+            
+            <div style={{ marginBottom: 24 }}>
+              <span style={{ fontSize: 12, color: C.accent, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>Offer Draft Preview</span>
+              <h2 style={{ fontSize: 22, fontWeight: 800, margin: "8px 0 4px" }}>{selectedDraft.merchant_name}</h2>
+              <p style={{ fontSize: 15, color: C.text, margin: 0, fontWeight: 600 }}>{selectedDraft.title}</p>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, marginBottom: 24 }}>
+              <div>
+                <label style={lbl}>Packages</label>
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  {JSON.parse(selectedDraft.options || "[]").map((o, i) => (
+                    <div key={i} style={{ padding: 12, background: "#f8fafc", borderRadius: 10, border: "1px solid #e2e8f0" }}>
+                      <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 4 }}>{o.title}</div>
+                      <div style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>{o.content}</div>
+                      <div style={{ fontSize: 13, fontWeight: 800, color: C.accent }}>{o.price} EGP <span style={{ textDecoration: "line-through", color: "#94a3b8", fontSize: 11, marginLeft: 6 }}>{o.originalPrice}</span></div>
                     </div>
-                  );
-                })}
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label style={lbl}>Terms</label>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {JSON.parse(selectedDraft.conditions || "[]").map((c, i) => (
+                    <div key={i} style={{ display: "flex", gap: 10, fontSize: 12, color: C.sub }}>
+                      <span>•</span>
+                      <span>{c}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* Action buttons */}
-          <div style={{ display: "flex", gap: 12, marginTop: 24, justifyContent: "flex-end" }}>
-            <button
-              onClick={handleEvaluate} disabled={evaluating || !offerTitle}
-              style={{ padding: "10px 20px", background: "#fff", color: C.text, border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: (evaluating || !offerTitle) ? "not-allowed" : "pointer", opacity: (evaluating || !offerTitle) ? 0.5 : 1, display: "inline-flex", alignItems: "center", gap: 8 }}
-            >
-              {evaluating ? <><Spinner dark />Evaluating…</> : "Evaluate with AI"}
-            </button>
-            <button
-              onClick={handleSave} disabled={saving || !merchantName || !offerTitle}
-              style={{ padding: "10px 24px", background: "#1A1A1A", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: (saving || !merchantName || !offerTitle) ? "not-allowed" : "pointer", opacity: (saving || !merchantName || !offerTitle) ? 0.5 : 1, display: "inline-flex", alignItems: "center", gap: 8 }}
-            >
-              {saving ? <><Spinner />Saving…</> : "Save Draft"}
-            </button>
-          </div>
-        </Card>
+            {selectedDraft.photos && JSON.parse(selectedDraft.photos).length > 0 && (
+              <div style={{ marginBottom: 24 }}>
+                <label style={lbl}>Merchant Media ({JSON.parse(selectedDraft.photos).length})</label>
+                <div style={{ display: "flex", gap: 12, overflowX: "auto", paddingBottom: 8 }}>
+                  {JSON.parse(selectedDraft.photos).map((url, i) => (
+                    <img 
+                      key={i} src={url} alt={`Draft ${i}`} 
+                      style={{ height: 100, width: 140, objectFit: "cover", borderRadius: 8, border: `1px solid ${C.border}`, flexShrink: 0 }} 
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
 
-      </div>
+            <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 24, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ fontSize: 11, color: C.muted }}>
+                Drafted by <b>{selectedDraft.created_by}</b> on {new Date(selectedDraft.created_at).toLocaleString()}
+              </div>
+              <button 
+                onClick={() => {
+                  setMerchantName(selectedDraft.merchant_name);
+                  setOfferTitle(selectedDraft.title);
+                  setOptions(JSON.parse(selectedDraft.options || "[]"));
+                  setConditions(JSON.parse(selectedDraft.conditions || "[]").map(t => ({ text: t, isDeleted: false })));
+                  setTicketId(selectedDraft.ticket_id || "");
+                  setPhotos(JSON.parse(selectedDraft.photos || "[]"));
+                  setActiveTab("create");
+                  setSelectedDraft(null);
+                }}
+                style={{ padding: "10px 20px", background: C.accent, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer" }}
+              >
+                Load into Editor
+              </button>
+            </div>
+          </Card>
+        </div>
+      )}
 
       {/* Photo Lightbox */}
       {selectedPhotoIndex !== null && (
-        <div 
+        <div
           style={{
             position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
             background: "rgba(0,0,0,0.9)", zIndex: 10000,
@@ -2805,7 +3002,7 @@ function OfferCreationTab({ anonKey, session }) {
           }}
           onClick={() => setSelectedPhotoIndex(null)}
         >
-          <button 
+          <button
             style={{ position: "absolute", top: 20, right: 20, background: "none", border: "none", color: "#fff", fontSize: 32, cursor: "pointer", zIndex: 10001 }}
             onClick={(e) => { e.stopPropagation(); setSelectedPhotoIndex(null); }}
           >
@@ -2813,11 +3010,11 @@ function OfferCreationTab({ anonKey, session }) {
           </button>
 
           {/* Navigation Buttons */}
-          <button 
+          <button
             disabled={selectedPhotoIndex === 0}
-            style={{ 
-              position: "absolute", left: 20, background: "rgba(255,255,255,0.15)", border: "none", 
-              color: "#fff", width: 52, height: 52, borderRadius: "50%", fontSize: 28, 
+            style={{
+              position: "absolute", left: 20, background: "rgba(255,255,255,0.15)", border: "none",
+              color: "#fff", width: 52, height: 52, borderRadius: "50%", fontSize: 28,
               cursor: selectedPhotoIndex === 0 ? "not-allowed" : "pointer", opacity: selectedPhotoIndex === 0 ? 0.3 : 1,
               display: "flex", alignItems: "center", justifyContent: "center",
               transition: "background 0.2s",
@@ -2825,26 +3022,26 @@ function OfferCreationTab({ anonKey, session }) {
             }}
             onMouseEnter={e => { if (selectedPhotoIndex > 0) e.currentTarget.style.background = "rgba(255,255,255,0.25)"; }}
             onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.15)"; }}
-            onClick={(e) => { 
-              e.stopPropagation(); 
-              if (selectedPhotoIndex > 0) setSelectedPhotoIndex(selectedPhotoIndex - 1); 
+            onClick={(e) => {
+              e.stopPropagation();
+              if (selectedPhotoIndex > 0) setSelectedPhotoIndex(selectedPhotoIndex - 1);
             }}
           >
             ‹
           </button>
 
-          <img 
-            src={photos[selectedPhotoIndex]} 
-            alt="Full size view" 
+          <img
+            src={photos[selectedPhotoIndex]}
+            alt="Full size view"
             style={{ maxHeight: "85vh", maxWidth: "80vw", objectFit: "contain", borderRadius: 8, boxShadow: "0 20px 60px rgba(0,0,0,0.8)" }}
             onClick={(e) => e.stopPropagation()}
           />
 
-          <button 
+          <button
             disabled={selectedPhotoIndex === photos.length - 1}
-            style={{ 
-              position: "absolute", right: 20, background: "rgba(255,255,255,0.15)", border: "none", 
-              color: "#fff", width: 52, height: 52, borderRadius: "50%", fontSize: 28, 
+            style={{
+              position: "absolute", right: 20, background: "rgba(255,255,255,0.15)", border: "none",
+              color: "#fff", width: 52, height: 52, borderRadius: "50%", fontSize: 28,
               cursor: selectedPhotoIndex === photos.length - 1 ? "not-allowed" : "pointer", opacity: selectedPhotoIndex === photos.length - 1 ? 0.3 : 1,
               display: "flex", alignItems: "center", justifyContent: "center",
               transition: "background 0.2s",
@@ -2852,9 +3049,9 @@ function OfferCreationTab({ anonKey, session }) {
             }}
             onMouseEnter={e => { if (selectedPhotoIndex < photos.length - 1) e.currentTarget.style.background = "rgba(255,255,255,0.25)"; }}
             onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.15)"; }}
-            onClick={(e) => { 
-              e.stopPropagation(); 
-              if (selectedPhotoIndex < photos.length - 1) setSelectedPhotoIndex(selectedPhotoIndex + 1); 
+            onClick={(e) => {
+              e.stopPropagation();
+              if (selectedPhotoIndex < photos.length - 1) setSelectedPhotoIndex(selectedPhotoIndex + 1);
             }}
           >
             ›
@@ -3011,6 +3208,7 @@ export default function App() {
   const [ticketsLoading, setTicketsLoading] = useState(false);
   const [selectedTicketId, setSelectedTicketId] = useState(null);
   const [selectedAgentId, setSelectedAgentId] = useState(null);
+  const [selectedCompetitorId, setSelectedCompetitorId] = useState(null);
   const [explorerFilters, setExplorerFilters] = useState({});
   const [userRole, setUserRole] = useState(() => {
     try {
@@ -3308,7 +3506,7 @@ export default function App() {
         </div>
 
         <nav style={{ padding: "10px 8px", flex: 1, overflowY: "auto" }}>
-          {["KSA Intelligence", "Oman Intelligence", "CRM & Support", "Content & Offers", "Settings"].map(group => {
+          {["KSA Intelligence", "Oman Intelligence", "Egypt Intelligence", "Competitive Intel", "CRM & Support", "Content & Offers", "Settings"].map(group => {
             const groupTabs = visibleTabs.filter(t => t.group === group);
             if (groupTabs.length === 0) return null;
             return (
@@ -3402,7 +3600,12 @@ export default function App() {
           <AgentProfile agentId={selectedAgentId} tickets={tickets} onBack={() => setTab("agents")} onTicketClick={handleTicketClick} onKPIFilter={(f) => { setExplorerFilters(f); handleTabChange("tickets"); }} />
         )}
         {tab === "admin" && userRole === "admin" && <AdminSettingsTab anonKey={anonKey} session={session} />}
+        {tab === "system_monitor" && userRole === "admin" && <SystemMonitorTab anonKey={anonKey} session={session} />}
         {tab === "offer_creation" && <OfferCreationTab anonKey={anonKey} session={session} />}
+        {tab === "egypt_merchants" && <EgyptTopMerchantsTab anonKey={anonKey} session={session} userRole={userRole} />}
+        {tab === "ci_overview"  && <CIOverviewTab  anonKey={anonKey} session={session} onSelectCompetitor={(id) => { setSelectedCompetitorId(id); setTab("ci_war_room"); }} />}
+        {tab === "ci_war_room"  && <CIWarRoomTab   anonKey={anonKey} session={session} competitorId={selectedCompetitorId} onBack={() => setTab("ci_overview")} />}
+        {tab === "ci_pipeline"  && <CIPipelineTab  anonKey={anonKey} session={session} />}
       </main>
     </div>
   );

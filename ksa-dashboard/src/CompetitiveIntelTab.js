@@ -540,26 +540,27 @@ export function CIWarRoomTab({ anonKey, session, competitorId, onBack }) {
   const [innerTab, setInnerTab]       = useState("insights");
   const [contentFilter, setContentFilter] = useState("all");
 
-  useEffect(() => {
+  const loadData = useCallback(async () => {
     if (!competitorId) return;
-    async function load() {
-      setLoading(true); setErr("");
-      try {
-        const [comps, m, cont, ins] = await Promise.all([
-          sbGet("competitors_directory",        anonKey, token, "*", `id=eq.${competitorId}`),
-          sbGet("competitor_metrics_history",   anonKey, token, "*", `competitor_id=eq.${competitorId}&order=snapshot_timestamp.asc`),
-          sbGet("competitor_content_raw",       anonKey, token, "*", `competitor_id=eq.${competitorId}&order=id.desc`),
-          sbGet("competitor_strategic_insights",anonKey, token, "*", `competitor_id=eq.${competitorId}&order=analysis_timestamp.desc&limit=5`),
-        ]);
-        setCompetitor(comps[0] || null);
-        setMetrics(m);
-        setContent(cont);
-        setInsights(ins);
-      } catch (e) { setErr(e.message); }
-      setLoading(false);
-    }
-    load();
+    setLoading(true); setErr("");
+    try {
+      const [comps, m, cont, ins] = await Promise.all([
+        sbGet("competitors_directory",        anonKey, token, "*", `id=eq.${competitorId}`),
+        sbGet("competitor_metrics_history",   anonKey, token, "*", `competitor_id=eq.${competitorId}&order=snapshot_timestamp.asc`),
+        sbGet("competitor_content_raw",       anonKey, token, "*", `competitor_id=eq.${competitorId}&order=id.desc`),
+        sbGet("competitor_strategic_insights",anonKey, token, "*", `competitor_id=eq.${competitorId}&order=analysis_timestamp.desc&limit=5`),
+      ]);
+      setCompetitor(comps[0] || null);
+      setMetrics(m);
+      setContent(cont);
+      setInsights(ins);
+    } catch (e) { setErr(e.message); }
+    setLoading(false);
   }, [anonKey, token, competitorId]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const latest        = metrics[metrics.length - 1] || {};
   const latestInsight = insights[0] || {};
@@ -649,7 +650,7 @@ export function CIWarRoomTab({ anonKey, session, competitorId, onBack }) {
           </div>
         </div>
         <div style={{ marginLeft: "auto", display: "flex", gap: 10 }}>
-          <button onClick={loadAll} style={{ background: C.bg, color: C.sub, border: `1px solid ${C.border}`, padding: "8px 16px", borderRadius: 8, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
+          <button onClick={loadData} style={{ background: C.bg, color: C.sub, border: `1px solid ${C.border}`, padding: "8px 16px", borderRadius: 8, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0114.85-3.36L23 10M1.49 14l4.64 4.36A9 9 0 0020.49 15" /></svg>
             Refresh
           </button>

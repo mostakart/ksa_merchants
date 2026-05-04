@@ -20,6 +20,7 @@ const C = {
   accent: "#FF5A00", accentL: "#FFF0ED", bg: "#F5F2EE",
   white: "#FFFFFF", border: "#E8E4DF", text: "#1A1A1A",
   muted: "#9B9792", sub: "#6B6B6B",
+  success: "#15803D", error: "#DC2626",
 };
 
 /* ─── MERCHANT CACHE ─────────────────────────────────────────── */
@@ -243,9 +244,9 @@ const TABS = [
   { id: "system_monitor", label: "System Monitor", group: "Settings", roles: ["admin"], d: "M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" },
   { id: "offer_creation", label: "Offer Creation", group: "Content & Offers", roles: ["admin", "content_editor"], d: "M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" },
   { id: "egypt_merchants", label: "Egypt Top Merchants", group: "Egypt Intelligence", roles: ["admin", "global_bd", "viewer"], d: "M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" },
-  { id: "ci_overview",  label: "Command Center",    group: "Competitive Intel", roles: ["admin", "global_bd"],              d: "M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" },
-  { id: "ci_war_room",  label: "Competitor Detail",  group: "Competitive Intel", roles: ["admin", "global_bd"],              d: "M15 12a3 3 0 11-6 0 3 3 0 016 0zm-3-9a9 9 0 100 18A9 9 0 0012 3z" },
-  { id: "ci_pipeline",  label: "Pipeline Control",   group: "Competitive Intel", roles: ["admin"],                           d: "M4 6h16M4 10h16M4 14h16M4 18h16" },
+  { id: "ci_overview", label: "Command Center", group: "Competitive Intel", roles: ["admin", "global_bd"], d: "M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" },
+  { id: "ci_war_room", label: "Competitor Detail", group: "Competitive Intel", roles: ["admin", "global_bd"], d: "M15 12a3 3 0 11-6 0 3 3 0 016 0zm-3-9a9 9 0 100 18A9 9 0 0012 3z" },
+  { id: "ci_pipeline", label: "Pipeline Control", group: "Competitive Intel", roles: ["admin"], d: "M4 6h16M4 10h16M4 14h16M4 18h16" },
 ];
 
 /* ─── SETUP SCREEN ───────────────────────────────────────────── */
@@ -2534,12 +2535,12 @@ function OfferCreationTab({ anonKey, session }) {
       const res = await fetch(`${SB_URL}/rest/v1/offer_drafts`, {
         method: "POST",
         headers: { ...sbH(anonKey, session.access_token), "Prefer": "return=minimal" },
-        body: JSON.stringify({ 
-          ticket_id: ticketId.trim(), 
-          merchant_name: merchantName, 
-          title: offerTitle, 
-          options: JSON.stringify(activeOptions), 
-          conditions: JSON.stringify(activeConditions), 
+        body: JSON.stringify({
+          ticket_id: ticketId.trim(),
+          merchant_name: merchantName,
+          title: offerTitle,
+          options: JSON.stringify(activeOptions),
+          conditions: JSON.stringify(activeConditions),
           created_by: session.user.email,
           photos: JSON.stringify(photos) // Save photo URLs
         }),
@@ -2849,13 +2850,13 @@ function OfferCreationTab({ anonKey, session }) {
           <Card style={{ padding: 0, overflow: "hidden" }}>
             <div style={{ padding: "16px 20px", borderBottom: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <h3 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>All Drafted Offers</h3>
-              <button 
-                onClick={fetchDrafts} 
+              <button
+                onClick={fetchDrafts}
                 title="Refresh Library"
-                style={{ 
+                style={{
                   display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
                   background: "none", border: `1px solid ${C.border}`, borderRadius: 8,
-                  padding: "6px 12px", color: C.sub, fontSize: 11, fontWeight: 600, cursor: "pointer", transition: "all 0.2s" 
+                  padding: "6px 12px", color: C.sub, fontSize: 11, fontWeight: 600, cursor: "pointer", transition: "all 0.2s"
                 }}
                 onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
                 onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.sub; }}
@@ -2897,7 +2898,7 @@ function OfferCreationTab({ anonKey, session }) {
                       </td>
                       <td style={{ padding: "14px 20px", color: C.muted }}>{new Date(d.created_at).toLocaleDateString()}</td>
                       <td style={{ padding: "14px 20px", textAlign: "right" }}>
-                        <button 
+                        <button
                           onClick={() => setSelectedDraft(d)}
                           style={{ padding: "6px 12px", background: "#fff", border: `1px solid ${C.border}`, borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer", transition: "all 0.2s" }}
                           onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
@@ -2920,7 +2921,7 @@ function OfferCreationTab({ anonKey, session }) {
         <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.6)", zIndex: 10002, display: "flex", alignItems: "center", justifyContent: "center", padding: 40 }} onClick={() => setSelectedDraft(null)}>
           <Card style={{ maxWidth: 800, width: "100%", maxHeight: "100%", overflowY: "auto", position: "relative", padding: 32 }} onClick={e => e.stopPropagation()}>
             <button onClick={() => setSelectedDraft(null)} style={{ position: "absolute", top: 20, right: 20, background: "none", border: "none", cursor: "pointer", fontSize: 24, color: C.muted }}>×</button>
-            
+
             <div style={{ marginBottom: 24 }}>
               <span style={{ fontSize: 12, color: C.accent, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>Offer Draft Preview</span>
               <h2 style={{ fontSize: 22, fontWeight: 800, margin: "8px 0 4px" }}>{selectedDraft.merchant_name}</h2>
@@ -2958,9 +2959,9 @@ function OfferCreationTab({ anonKey, session }) {
                 <label style={lbl}>Merchant Media ({JSON.parse(selectedDraft.photos).length})</label>
                 <div style={{ display: "flex", gap: 12, overflowX: "auto", paddingBottom: 8 }}>
                   {JSON.parse(selectedDraft.photos).map((url, i) => (
-                    <img 
-                      key={i} src={url} alt={`Draft ${i}`} 
-                      style={{ height: 100, width: 140, objectFit: "cover", borderRadius: 8, border: `1px solid ${C.border}`, flexShrink: 0 }} 
+                    <img
+                      key={i} src={url} alt={`Draft ${i}`}
+                      style={{ height: 100, width: 140, objectFit: "cover", borderRadius: 8, border: `1px solid ${C.border}`, flexShrink: 0 }}
                     />
                   ))}
                 </div>
@@ -2971,7 +2972,7 @@ function OfferCreationTab({ anonKey, session }) {
               <div style={{ fontSize: 11, color: C.muted }}>
                 Drafted by <b>{selectedDraft.created_by}</b> on {new Date(selectedDraft.created_at).toLocaleString()}
               </div>
-              <button 
+              <button
                 onClick={() => {
                   setMerchantName(selectedDraft.merchant_name);
                   setOfferTitle(selectedDraft.title);
@@ -3260,7 +3261,7 @@ export default function App() {
   // 1. Role-Based Redirection: Ensure user is on a tab they have access to
   useEffect(() => {
     if (!userRole) return;
-    const currentTabAllowed = tab ? TABS.find(t => t.id === tab)?.roles.includes(userRole) : false;
+    const currentTabAllowed = tab ? (TABS.find(t => t.id === tab)?.roles || []).includes(userRole) : false;
     if (!currentTabAllowed) {
       const visibleTabs = TABS.filter(t => t.roles.includes(userRole));
       if (visibleTabs.length > 0) handleTabChange(visibleTabs[0].id);
@@ -3603,9 +3604,9 @@ export default function App() {
         {tab === "system_monitor" && userRole === "admin" && <SystemMonitorTab anonKey={anonKey} session={session} />}
         {tab === "offer_creation" && <OfferCreationTab anonKey={anonKey} session={session} />}
         {tab === "egypt_merchants" && <EgyptTopMerchantsTab anonKey={anonKey} session={session} userRole={userRole} />}
-        {tab === "ci_overview"  && <CIOverviewTab  anonKey={anonKey} session={session} onSelectCompetitor={(id) => { setSelectedCompetitorId(id); setTab("ci_war_room"); }} />}
-        {tab === "ci_war_room"  && <CIWarRoomTab   anonKey={anonKey} session={session} competitorId={selectedCompetitorId} onBack={() => setTab("ci_overview")} />}
-        {tab === "ci_pipeline"  && <CIPipelineTab  anonKey={anonKey} session={session} />}
+        {tab === "ci_overview" && <CIOverviewTab anonKey={anonKey} session={session} onSelectCompetitor={(id) => { setSelectedCompetitorId(id); setTab("ci_war_room"); }} />}
+        {tab === "ci_war_room" && <CIWarRoomTab anonKey={anonKey} session={session} competitorId={selectedCompetitorId} onBack={() => setTab("ci_overview")} />}
+        {tab === "ci_pipeline" && <CIPipelineTab anonKey={anonKey} session={session} />}
       </main>
     </div>
   );

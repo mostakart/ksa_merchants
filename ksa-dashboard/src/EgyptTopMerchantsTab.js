@@ -9,6 +9,7 @@ const C = {
   accent: "#FF5A00", accentL: "#FFF0ED", bg: "#F5F2EE",
   white: "#FFFFFF", border: "#E8E4DF", text: "#1A1A1A",
   muted: "#9B9792", sub: "#6B6B6B",
+  success: "#15803D", error: "#DC2626",
 };
 
 const CATEGORIES = [

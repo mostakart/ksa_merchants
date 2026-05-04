@@ -11,6 +11,7 @@ const C = {
   accent: "#FF5A00", accentL: "#FFF0ED", bg: "#F5F2EE",
   white: "#FFFFFF", border: "#E8E4DF", text: "#1A1A1A",
   muted: "#9B9792", sub: "#6B6B6B",
+  success: "#15803D", error: "#DC2626",
   // CI-specific semantic colors
   threat: "#FEF2F2",    threatText: "#991B1B",    threatBorder: "#FECACA",
   opp: "#F0FDF4",       oppText: "#15803D",       oppBorder: "#BBF7D0",
@@ -177,12 +178,14 @@ function InsightSection({ title, icon, content, fullWidth, isList, color }) {
           {data.map((item, i) => (
              <li key={i} style={{ fontSize: 13, color: C.sub, lineHeight: 1.5, display: "flex", gap: 8 }}>
                <span style={{ color: color || C.accent }}>•</span>
-               {item}
+               {typeof item === 'object' ? JSON.stringify(item) : String(item)}
              </li>
           ))}
         </ul>
       ) : (
-        <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{data}</div>
+        <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
+          {typeof data === 'object' ? JSON.stringify(data, null, 2) : String(data)}
+        </div>
       )}
     </CICard>
   );
@@ -616,7 +619,7 @@ export function CIWarRoomTab({ anonKey, session, competitorId, onBack }) {
     if (curr == null || prev == null) return null;
     const diff = curr - prev;
     if (diff === 0) return null;
-    return <span style={{ color: diff > 0 ? C.success : C.error, fontSize: 11, marginLeft: 6, fontWeight: 700 }}>{diff > 0 ? "+" : ""}{isPct ? diff.toFixed(1) + "%" : (typeof diff === "number" && diff % 1 !== 0 ? diff.toFixed(1) : diff)}</span>;
+    return <span style={{ color: diff > 0 ? (C.success || "#15803D") : (C.error || "#DC2626"), fontSize: 11, marginLeft: 6, fontWeight: 700 }}>{diff > 0 ? "+" : ""}{isPct ? diff.toFixed(1) + "%" : (typeof diff === "number" && diff % 1 !== 0 ? diff.toFixed(1) : diff)}</span>;
   };
 
   return (
@@ -738,10 +741,10 @@ export function CIWarRoomTab({ anonKey, session, competitorId, onBack }) {
 
             {/* Strategic Summary Bar */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
-              <InsightMetric label="Sentiment" value={(latestInsight.sentiment_score * 100 || 68).toFixed(0) + "%"} color={(latestInsight.sentiment_score || 0.6) > 0.5 ? C.success : C.threatText} />
+              <InsightMetric label="Sentiment" value={(latestInsight.sentiment_score * 100 || 68).toFixed(0) + "%"} color={(latestInsight.sentiment_score || 0.6) > 0.5 ? (C.success || "#15803D") : (C.threatText || "#991B1B")} />
               <InsightMetric label="Trend" value={latestInsight.trend_category || "Market Entry"} />
               <InsightMetric label="Model" value={latestInsight.analysis_model || "Claude-3.5"} />
-              <InsightMetric label="Processing" value={(latestInsight.processing_time_ms / 1000 || 4.2).toFixed(1) + "s"} />
+              <InsightMetric label="Processing" value={((latestInsight.processing_time_ms || 0) / 1000 || 4.2).toFixed(1) + "s"} />
             </div>
 
             {/* Main Insights Grid */}

@@ -61,7 +61,7 @@ export function SystemMonitorTab({ anonKey, session }) {
         if (auditRes.ok) setAudits(await auditRes.json());
 
         // Pipeline Jobs
-        const jobsRes = await fetch(`${SB}/pipeline_jobs?select=*&order=queued_at.desc&limit=20`, { headers: h });
+        const jobsRes = await fetch(`${SB}/pipeline_jobs?select=*&order=created_at.desc&limit=20`, { headers: h });
         if (jobsRes.ok) {
           const jobs = await jobsRes.json();
           setPipelineJobs(jobs);
@@ -97,10 +97,10 @@ export function SystemMonitorTab({ anonKey, session }) {
 
     pipelineJobs.forEach(job => {
       const shortId = (job.id || "").slice(0, 8);
-      if (job.queued_at) {
+      if (job.created_at) {
         entries.push({
           key: `job-q-${job.id}`,
-          ts: new Date(job.queued_at),
+          ts: new Date(job.created_at),
           type: "job",
           level: "JOB",
           message: `Pipeline job queued | id=${shortId} | batch_size=${job.batch_size ?? "?"}`,
@@ -118,7 +118,7 @@ export function SystemMonitorTab({ anonKey, session }) {
         });
       }
       if (job.completed_at) {
-        const durMs = new Date(job.completed_at) - new Date(job.started_at || job.queued_at);
+        const durMs = new Date(job.completed_at) - new Date(job.started_at || job.created_at);
         const durStr = durMs > 0 ? ` | duration=${Math.round(durMs / 1000)}s` : "";
         entries.push({
           key: `job-c-${job.id}`,
@@ -216,7 +216,7 @@ export function SystemMonitorTab({ anonKey, session }) {
                         <span style={{ background: `${sc}20`, color: sc, padding: "2px 8px", borderRadius: 4, fontWeight: 700, fontSize: 11, textTransform: "uppercase" }}>{job.status}</span>
                       </td>
                       <td style={{ padding: "10px 16px", color: C.text }}>{job.batch_size ?? "—"}</td>
-                      <td style={{ padding: "10px 16px", color: C.muted }}>{job.queued_at ? new Date(job.queued_at).toLocaleString() : "—"}</td>
+                      <td style={{ padding: "10px 16px", color: C.muted }}>{job.created_at ? new Date(job.created_at).toLocaleString() : "—"}</td>
                       <td style={{ padding: "10px 16px", color: C.muted }}>{job.started_at ? new Date(job.started_at).toLocaleString() : "—"}</td>
                       <td style={{ padding: "10px 16px", color: C.muted }}>{job.completed_at ? new Date(job.completed_at).toLocaleString() : "—"}</td>
                     </tr>

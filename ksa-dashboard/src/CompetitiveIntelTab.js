@@ -41,10 +41,6 @@ async function sbGet(table, key, token, select = "*", filter = "") {
     });
     if (!r.ok) {
       const errText = await r.text();
-      if (errText.includes("JWT") || errText.includes("PGRST303")) {
-        localStorage.removeItem("wn_session");
-        window.location.reload();
-      }
       throw new Error(errText);
     }
     const data = await r.json();
@@ -63,10 +59,6 @@ async function sbPatch(table, key, token, filter, body) {
   });
   if (!r.ok) {
     const errText = await r.text();
-    if (errText.includes("JWT") || errText.includes("PGRST303")) {
-      localStorage.removeItem("wn_session");
-      window.location.reload();
-    }
     throw new Error(errText);
   }
   return r.json();
@@ -80,10 +72,6 @@ async function sbPost(table, key, token, body) {
   });
   if (!r.ok) {
     const errText = await r.text();
-    if (errText.includes("JWT") || errText.includes("PGRST303")) {
-      localStorage.removeItem("wn_session");
-      window.location.reload();
-    }
     throw new Error(errText);
   }
   return r.json();
@@ -557,7 +545,12 @@ export function CIWarRoomTab({ anonKey, session, competitorId, onBack }) {
       setMetrics(m);
       setContent(cont);
       setInsights(ins);
-    } catch (e) { setErr(e.message); }
+    } catch (e) {
+      const msg = e.message || "";
+      setErr(msg.includes("JWT") || msg.includes("expired")
+        ? "Your session has expired. Please refresh the page and sign in again."
+        : msg);
+    }
     setLoading(false);
   }, [anonKey, token, competitorId]);
 

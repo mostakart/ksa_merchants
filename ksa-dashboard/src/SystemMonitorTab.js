@@ -18,25 +18,25 @@ export function SystemMonitorTab({ anonKey, session }) {
   const token = session?.access_token;
   const [logs, setLogs] = useState([]);
   const [audits, setAudits] = useState([]);
+  const [pipelineJobs, setPipelineJobs] = useState([]);
   const [health, setHealth] = useState({
     supabase: "checking",
     daemon: "checking",
     claude: "checking",
-    playwright: "unknown" // hard to check directly from frontend
+    playwright: "unknown"
   });
-  
+
   const terminalRef = useRef(null);
 
-  // Poll for logs and audits
   useEffect(() => {
     let interval;
-    
+
     const fetchData = async () => {
       try {
         // 1. Fetch Agent Logs
         const logRes = await fetch(`https://omowdfzyudedrtcuhnvy.supabase.co/rest/v1/agent_logs?select=*&order=timestamp.desc&limit=100`, {
-          headers: { 
-            apikey: anonKey, 
+          headers: {
+            apikey: anonKey,
             Authorization: `Bearer ${token}`,
             "Cache-Control": "no-cache",
             "Pragma": "no-cache"
@@ -44,20 +44,19 @@ export function SystemMonitorTab({ anonKey, session }) {
         });
         if (logRes.ok) {
           const logData = await logRes.json();
-          setLogs(logData.reverse()); // oldest first for terminal view
-          
-          // Determine Daemon health based on latest log timestamp
+          setLogs(logData.reverse());
+
           if (logData.length > 0) {
             const lastLogTime = new Date(logData[logData.length - 1].timestamp);
             const diffMins = (new Date() - lastLogTime) / 1000 / 60;
             setHealth(h => ({ ...h, daemon: diffMins < 10 ? "healthy" : "warning" }));
           }
         }
-        
+
         // 2. Fetch Audit Logs
         const auditRes = await fetch(`https://omowdfzyudedrtcuhnvy.supabase.co/rest/v1/nexus_audit_log?select=*&order=created_at.desc&limit=50`, {
-          headers: { 
-            apikey: anonKey, 
+          headers: {
+            apikey: anonKey,
             Authorization: `Bearer ${token}`,
             "Cache-Control": "no-cache",
             "Pragma": "no-cache"
@@ -66,18 +65,33 @@ export function SystemMonitorTab({ anonKey, session }) {
         if (auditRes.ok) {
           setAudits(await auditRes.json());
         }
-        
-        // 3. Supabase Health Check (if the above worked, it's healthy)
-        setHealth(h => ({ ...h, supabase: "healthy", claude: "healthy" })); // Assuming claude is healthy if agent logs don't show errors
-        
+
+        // 3. Fetch Pipeline Jobs
+        const jobsRes = await fetch(`https://omowdfzyudedrtcuhnvy.supabase.co/rest/v1/pipeline_jobs?select=*&order=queued_at.desc&limit=10`, {
+          headers: {
+            apikey: anonKey,
+            Authorization: `Bearer ${token}`,
+            "Cache-Control": "no-cache",
+            "Pragma": "no-cache"
+          }
+        });
+        if (jobsRes.ok) {
+          const jobsData = await jobsRes.json();
+          setPipelineJobs(jobsData);
+          const hasActiveJob = jobsData.some(j => j.status === "running" || j.status === "pending");
+          setHealth(h => ({ ...h, daemon: hasActiveJob ? "healthy" : h.daemon }));
+        }
+
+        setHealth(h => ({ ...h, supabase: "healthy", claude: "healthy" }));
+
       } catch (e) {
         setHealth(h => ({ ...h, supabase: "error" }));
       }
     };
-    
+
     fetchData();
-    interval = setInterval(fetchData, 3000); // Poll every 3s
-    
+    interval = setInterval(fetchData, 3000);
+
     return () => clearInterval(interval);
   }, [anonKey, token]);
 
@@ -118,7 +132,7 @@ export function SystemMonitorTab({ anonKey, session }) {
     <div style={{ color: C.text }}>
       <div style={{ marginBottom: 24 }}>
         <h2 style={{ fontSize: 24, fontWeight: 800, margin: "0 0 4px", letterSpacing: "-.5px", display: "flex", alignItems: "center", gap: 10 }}>
-          <span>👁️‍🗨️</span> System Monitor (God Mode)
+          <span>👁️‍🗨️</span> System Monitor
         </h2>
         <p style={{ margin: 0, color: C.muted, fontSize: 13 }}>Real-time telemetry, API health, and user auditing.</p>
       </div>
@@ -142,6 +156,47 @@ export function SystemMonitorTab({ anonKey, session }) {
           <StatusLight status="healthy" /> {/* Placeholder, assuming healthy if scraping runs */}
         </div>
       </div>
+
+      {/* Pipeline Jobs Live Status */}
+      {pipelineJobs.length > 0 && (
+        <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 10, marginBottom: 20 }}>
+          <div style={{ padding: "12px 16px", borderBottom: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: 13, fontWeight: 700 }}>Pipeline Jobs</span>
+            <span style={{ fontSize: 10, color: C.success, display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ width: 6, height: 6, borderRadius: "50%", background: C.success, display: "inline-block" }} />
+              LIVE
+            </span>
+          </div>
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+              <thead>
+                <tr style={{ borderBottom: `1px solid ${C.border}` }}>
+                  {["Status", "Batch Size", "Queued At", "Started At", "Completed At"].map(h => (
+                    <th key={h} style={{ padding: "8px 16px", textAlign: "left", color: C.muted, fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: 0.5 }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {pipelineJobs.map((job, i) => {
+                  const statusColors = { completed: C.success, running: C.warning, pending: "#60A5FA", failed: C.error };
+                  const sc = statusColors[job.status] || C.muted;
+                  return (
+                    <tr key={i} style={{ borderBottom: i === pipelineJobs.length - 1 ? "none" : `1px solid ${C.border}`, background: (job.status === "running" || job.status === "pending") ? "rgba(251,191,36,0.05)" : "transparent" }}>
+                      <td style={{ padding: "10px 16px" }}>
+                        <span style={{ background: `${sc}20`, color: sc, padding: "2px 8px", borderRadius: 4, fontWeight: 700, fontSize: 11, textTransform: "uppercase" }}>{job.status}</span>
+                      </td>
+                      <td style={{ padding: "10px 16px", color: C.text }}>{job.batch_size ?? "—"}</td>
+                      <td style={{ padding: "10px 16px", color: C.muted }}>{job.queued_at ? new Date(job.queued_at).toLocaleString() : "—"}</td>
+                      <td style={{ padding: "10px 16px", color: C.muted }}>{job.started_at ? new Date(job.started_at).toLocaleString() : "—"}</td>
+                      <td style={{ padding: "10px 16px", color: C.muted }}>{job.completed_at ? new Date(job.completed_at).toLocaleString() : "—"}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 20 }}>
         
